@@ -29,6 +29,10 @@
 
 using ROOT::Math::VectorUtil::Angle;
 
+// For Calorimetry normalization
+#include "art/Utilities/make_tool.h"
+#include "larreco/Calorimetry/INormalizeCharge.h"
+
 namespace ShowerRecoTools {
 
   class ShowerTrajPointdEdx : IShowerTool {
@@ -44,10 +48,20 @@ namespace ShowerRecoTools {
     void FinddEdxLength(std::vector<double>& dEdx_vec, std::vector<double>& dEdx_val);
 
   private:
+    // Normalization function
+    double Normalize(double dQdx,
+		     const art::Event& e,
+		     const recob::Hit& h,
+		     const geo::Point_t& location,
+		     const geo::Vector_t& direction,
+		     double t0);
+
     //Servcies and Algorithms
     art::ServiceHandle<geo::Geometry> fGeom;
     geo::WireReadoutGeom const& fChannelMap = art::ServiceHandle<geo::WireReadout>()->Get();
     calo::CalorimetryAlg fCalorimetryAlg;
+
+    std::vector< std::unique_ptr<INormalizeCharge> > fNormalizationTools;
 
     //fcl parameters
     float fMinAngleToWire; //Minimum angle between the wire direction and the shower
@@ -72,8 +86,7 @@ namespace ShowerRecoTools {
       fSCECorrectEField; // Whether to use the local electric field, from SpaceChargeService, in recombination calc.
     bool
       fSCEInputCorrected; // Whether the input has already been corrected for spatial SCE distortions
-
-    bool fSumHitSnippets; // Whether to treat hits individually or only one hit per snippet
+    bool fApplyCorrectionsInNorm; // Whether to instead apply calorimetry corrections in norm.
 
     art::InputTag fPFParticleLabel;
     int fVerbose;
@@ -102,7 +115,7 @@ namespace ShowerRecoTools {
     , fSCECorrectPitch(pset.get<bool>("SCECorrectPitch"))
     , fSCECorrectEField(pset.get<bool>("SCECorrectEField"))
     , fSCEInputCorrected(pset.get<bool>("SCEInputCorrected"))
-    , fSumHitSnippets(pset.get<bool>("SumHitSnippets"))
+    , fApplyCorrectionsInNorm(pset.get<bool>("ApplyCorrectionsInNorm"))
     , fPFParticleLabel(pset.get<art::InputTag>("PFParticleLabel"))
     , fVerbose(pset.get<int>("Verbose"))
     , fShowerStartPositionInputLabel(pset.get<std::string>("ShowerStartPositionInputLabel"))
@@ -121,11 +134,8 @@ namespace ShowerRecoTools {
     if ( fApplyCorrectionsInNorm ) {
       auto tool_psets = pset.get< std::vector< fhicl::ParameterSet > >("NormTools");
 
-      int tCounter = 0;
       for ( auto const& tool_pset : tool_psets ) {
-        //std::cout << "pushing back tools..." << tCounter << std::endl;
-        tCounter++;
-	      fNormalizationTools.push_back( art::make_tool<INormalizeCharge>(tool_pset) );
+	fNormalizationTools.push_back( art::make_tool<INormalizeCharge>(tool_pset) );
       }
     }
   }
@@ -333,19 +343,15 @@ namespace ShowerRecoTools {
         localEField = IShowerTool::GetLArPandoraShowerAlg().SCECorrectEField(localEField, pos);
       }
 
-      // Attempt the normalization //Ivan
-      double dQdxNorm = dQdx;
+      // Attempt the normalization
       if ( fApplyCorrectionsInNorm ) {
-        //std::cout << "Running the CorrectionsInNorm for showers" << std::endl;
-	      dQdxNorm = Normalize( dQdx,
-			    Event,
-			    *hit,
-			    InitialTrack.LocationAtPoint(index),
-			    InitialTrack.DirectionAtPoint(index),
-			    pfpT0Time );
+	dQdx = Normalize( dQdx,
+			  Event,
+			  *hit,
+			  InitialTrack.LocationAtPoint(index),
+			  InitialTrack.DirectionAtPoint(index),
+			  pfpT0Time );
       }
-
-      //std::cout << "Traj Point: dQdx: " << dQdx << " dQdxNorm: " << dQdxNorm << std::endl;
 
       double dEdx = fCalorimetryAlg.dEdx_AREA(
         clockData, detProp, dQdx, hit->PeakTime(), planeid.Plane, pfpT0Time, localEField);
@@ -423,6 +429,12 @@ namespace ShowerRecoTools {
       }
     }
 
+    // BH - test
+    std::cout << "--------------------------------------------------------------------" << std::endl;
+    std::cout << "  Init trk start (" << InitialTrack.Start().X() << ", " << InitialTrack.Start().Y() << ", " << InitialTrack.Start().Z() << ")" << std::endl;
+    std::cout << "  dE/dx on plane2: " << dEdx_val[2] << " MeV/cm" << std::endl;
+    std::cout << "--------------------------------------------------------------------" << std::endl;
+    
     //Need to sort out errors sensibly.
     ShowerEleHolder.SetElement(dEdx_val, dEdx_valErr, fShowerdEdxOutputLabel);
     ShowerEleHolder.SetElement(best_plane, fShowerBestPlaneOutputLabel);
@@ -526,17 +538,16 @@ namespace ShowerRecoTools {
     return;
   }
   
-  const double ShowerTrajPointdEdx::Normalize(const double dQdx,
+  double ShowerTrajPointdEdx::Normalize(double dQdx,
 					const art::Event& e,
 					const recob::Hit& h,
 					const geo::Point_t& location,
 					const geo::Vector_t& direction,
-					const double t0)
+					double t0)
   {
     double ret = dQdx;
     for (auto const& nt : fNormalizationTools) {
       ret = nt->Normalize(ret, e, h, location, direction, t0);
-      //std::cout << "\t norm: dQdx = " << ret << std::endl;
     }
     
     return ret;
