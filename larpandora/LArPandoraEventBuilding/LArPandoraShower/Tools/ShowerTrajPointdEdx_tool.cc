@@ -86,6 +86,7 @@ namespace ShowerRecoTools {
       fSCECorrectEField; // Whether to use the local electric field, from SpaceChargeService, in recombination calc.
     bool
       fSCEInputCorrected; // Whether the input has already been corrected for spatial SCE distortions
+    bool fSumHitSnippets; // Whether to treat hits individually or only one hit per snippet
     bool fApplyCorrectionsInNorm; // Whether to instead apply calorimetry corrections in norm.
 
     art::InputTag fPFParticleLabel;
@@ -115,6 +116,7 @@ namespace ShowerRecoTools {
     , fSCECorrectPitch(pset.get<bool>("SCECorrectPitch"))
     , fSCECorrectEField(pset.get<bool>("SCECorrectEField"))
     , fSCEInputCorrected(pset.get<bool>("SCEInputCorrected"))
+    , fSumHitSnippets(pset.get<bool>("SumHitSnippets"))
     , fApplyCorrectionsInNorm(pset.get<bool>("ApplyCorrectionsInNorm"))
     , fPFParticleLabel(pset.get<art::InputTag>("PFParticleLabel"))
     , fVerbose(pset.get<int>("Verbose"))
