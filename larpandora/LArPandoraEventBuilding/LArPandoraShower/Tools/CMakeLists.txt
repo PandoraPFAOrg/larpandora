@@ -168,6 +168,8 @@ cet_build_plugin(ShowerUnidirectiondEdx larpandora::ShowerTool
   larreco::Calorimetry
   lardata::DetectorClocksService
   lardata::DetectorPropertiesService
+  larpandora::LArPandoraInterface
+
 )
 
 add_subdirectory(Cheating)
