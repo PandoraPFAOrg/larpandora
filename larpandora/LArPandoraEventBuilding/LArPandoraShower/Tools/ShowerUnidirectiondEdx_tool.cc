@@ -43,12 +43,12 @@ namespace ShowerRecoTools {
   private:
 
     // Normalization function
-    double Normalize(double dQdx,
+    const double Normalize(const double dQdx,
 		     const art::Event& e,
 		     const recob::Hit& h,
 		     const geo::Point_t& location,
 		     const geo::Vector_t& direction,
-		     double t0);
+		     const double t0);
 
     //Define the services and algorithms
     art::ServiceHandle<geo::Geometry> fGeom;
@@ -97,7 +97,7 @@ namespace ShowerRecoTools {
 
       int tCounter = 0;
       for ( auto const& tool_pset : tool_psets ) {
-        std::cout << "pushing back tools..." << tCounter << std::endl;
+        //std::cout << "pushing back tools..." << tCounter << std::endl;
         tCounter++;
 	      fNormalizationTools.push_back( art::make_tool<INormalizeCharge>(tool_pset) );
       }
@@ -115,7 +115,7 @@ namespace ShowerRecoTools {
     SpacePointsToHits spacePointsToHits;
     HitsToSpacePoints hitsToSpacePoints;
     LArPandoraHelper::CollectSpacePoints(Event, fPFParticleLabel.label(), spacePointVector, spacePointsToHits, hitsToSpacePoints);
-    std::cout << "There are " << hitsToSpacePoints.size() << " hits associated with space points" << std::endl;
+    // std::cout << "There are " << hitsToSpacePoints.size() << " hits associated with space points" << std::endl;
 
     // Shower dEdx calculation
     if (!ShowerEleHolder.CheckElement(fShowerStartPositionInputLabel)) {
@@ -154,6 +154,11 @@ namespace ShowerRecoTools {
 
     geo::Vector_t showerDir = {-999, -999, -999};
     ShowerEleHolder.GetElement(fShowerDirectionInputLabel, showerDir);
+
+    geo::Vector_t showerPCADir = {-999, -999, -999};
+    ShowerEleHolder.GetElement("ShowerDirection", showerPCADir);
+
+    //std::cout << "Shower direction from PCA: " << showerPCADir.X() << " " << showerPCADir.Y() << " " << showerPCADir.Z() << std::endl;
 
     //std::cout << TString(Form("Shower position %f %f %f, and direction %f %f %f", ShowerStartPosition.X(), ShowerStartPosition.Y(), ShowerStartPosition.Z(),
     //                      showerDir.X(), showerDir.Y(), showerDir.Z())) << std::endl;
@@ -261,7 +266,7 @@ namespace ShowerRecoTools {
                 auto const& pos = spacepoint->position();  // this is a geo::Point_t
                 chargeWeightedPosition += geo::Vector_t{pos.X(), pos.Y(), pos.Z()} * q;
                 totalCharge += q; // Accumulate total charge
-                std::cout << "updating charge weighted position with q: " << q << std::endl;
+                //std::cout << "updating charge weighted position with q: " << q << std::endl;
               }
 
             }
@@ -270,8 +275,8 @@ namespace ShowerRecoTools {
           // Calculate the final charge weighted average position
           if (totalCharge > 0) {
             chargeWeightedPosition /= totalCharge; // Normalize by total charge
-            std::cout << "Charge weighted position: (" << chargeWeightedPosition.X() << ", "
-                      << chargeWeightedPosition.Y() << ", " << chargeWeightedPosition.Z() << ")" << std::endl;
+            // std::cout << "Charge weighted position: (" << chargeWeightedPosition.X() << ", "
+            //           << chargeWeightedPosition.Y() << ", " << chargeWeightedPosition.Z() << ")" << std::endl;
           }
 
           if (totQ) {
@@ -357,6 +362,7 @@ namespace ShowerRecoTools {
     double ret = dQdx;
     for (auto const& nt : fNormalizationTools) {
       ret = nt->Normalize(ret, e, h, location, direction, t0);
+      std::cout << "\t norm: dQdx = " << ret << std::endl;
     }
     
     return ret;
