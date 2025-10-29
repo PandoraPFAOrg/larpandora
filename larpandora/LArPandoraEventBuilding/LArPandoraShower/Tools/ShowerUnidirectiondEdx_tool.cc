@@ -362,7 +362,7 @@ namespace ShowerRecoTools {
     double ret = dQdx;
     for (auto const& nt : fNormalizationTools) {
       ret = nt->Normalize(ret, e, h, location, direction, t0);
-      std::cout << "\t norm: dQdx = " << ret << std::endl;
+      //std::cout << "\t norm: dQdx = " << ret << std::endl;
     }
     
     return ret;
