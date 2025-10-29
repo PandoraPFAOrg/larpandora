@@ -90,6 +90,10 @@ namespace ShowerRecoTools {
       return 1;
     }
 
+    // Setup normalization tools
+    for (auto const& nt : fNormalizationTools)
+      nt->setup(Event);
+
     //Get the initial track hits
     std::vector<art::Ptr<recob::Hit>> trackhits;
     ShowerEleHolder.GetElement(fInitialTrackHitsInputLabel, trackhits);
@@ -198,9 +202,26 @@ namespace ShowerRecoTools {
             }
 
             //Get the median and calculate the dEdx using the algorithm.
-            double dQdx = TMath::Median(vQ.size(), &vQ[0]) / pitch;
-            dEdx = fCalorimetryAlg.dEdx_AREA(
-              clockData, detProp, dQdx, avgT / nhits, trackPlaneHits.at(0)->WireID().Plane);
+            if (vQ.size() > 0) {
+              double dQdx = TMath::Median(vQ.size(), &vQ[0]) / pitch;
+              const auto& hit = trackPlaneHits.at(0);
+              double dQdxNorm = dQdx;
+              // Attempt the normalization //Mike 
+              if ( fApplyCorrectionsInNorm ) {
+                //geo::Vector_t displacement(0, 0, 0);
+                //std::cout << "Running the CorrectionsInNorm for showers" << std::endl;
+                dQdxNorm = Normalize( dQdx,
+                  Event,
+                  *hit,
+                  chargeWeightedPosition,
+                  showerPCADir,
+                  0 );
+              }
+              //std::cout << "Unidirection: dQdx: " << dQdx << " dQdxNorm: " << dQdxNorm << std::endl;
+
+              dEdx = fCalorimetryAlg.dEdx_AREA(
+                clockData, detProp, dQdxNorm, avgT / nhits, trackPlaneHits.at(0)->WireID().Plane);
+            }
 
             if (isinf(dEdx)) { dEdx = -999; };
 
@@ -245,6 +266,22 @@ namespace ShowerRecoTools {
     }
 
     return 0;
+  }
+
+  const double ShowerUnidirectiondEdx::Normalize(const double dQdx,
+					const art::Event& e,
+					const recob::Hit& h,
+					const geo::Point_t& location,
+					const geo::Vector_t& direction,
+					const double t0)
+  {
+    double ret = dQdx;
+    for (auto const& nt : fNormalizationTools) {
+      ret = nt->Normalize(ret, e, h, location, direction, t0);
+      //std::cout << "\t norm: dQdx = " << ret << std::endl;
+    }
+    
+    return ret;
   }
 }
 
