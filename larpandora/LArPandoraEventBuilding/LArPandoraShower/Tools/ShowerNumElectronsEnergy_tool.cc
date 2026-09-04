@@ -51,6 +51,7 @@ namespace ShowerRecoTools {
                            const geo::PlaneID::PlaneID_t plane,
                            const art::Event& Event,  
                            const bool applyNormalization,
+                           const bool applyMCLifetimeCorrection,
                            const HitsToSpacePoints& hitsToSpacePoints,
                            const geo::Vector_t& showerPCADir) const;
 
@@ -77,6 +78,7 @@ namespace ShowerRecoTools {
     // Declare stuff
     double fRecombinationFactor;
     bool fApplyCorrectionsInNorm; // Whether to instead apply calorimetry corrections in norm.
+    bool fApplyMCLifetimeCorrection; // Whether to apply MC lifetime correction
 
   };
 
@@ -89,6 +91,7 @@ namespace ShowerRecoTools {
     , fCalorimetryAlg(pset.get<fhicl::ParameterSet>("CalorimetryAlg"))
     , fRecombinationFactor(pset.get<double>("RecombinationFactor"))
     , fApplyCorrectionsInNorm(pset.get<bool>("ApplyCorrectionsInNorm"))
+    , fApplyMCLifetimeCorrection(pset.get<bool>("ApplyMCLifetimeCorrection"))
   {
     if ( fApplyCorrectionsInNorm ) {
       auto tool_psets = pset.get< std::vector< fhicl::ParameterSet > >("NormTools");
@@ -173,7 +176,7 @@ namespace ShowerRecoTools {
       unsigned int planeNumHits = hits.size();
 
       //Calculate the Energy for
-      double Energy = CalculateEnergy(clockData, detProp, hits, plane, Event, fApplyCorrectionsInNorm, hitsToSpacePoints, showerPCADir);
+      double Energy = CalculateEnergy(clockData, detProp, hits, plane, Event, fApplyCorrectionsInNorm, fApplyMCLifetimeCorrection, hitsToSpacePoints, showerPCADir);
 
       // If the energy is negative, leave it at -999
       if (Energy > 0) energyVec.at(plane) = Energy;
@@ -203,6 +206,7 @@ namespace ShowerRecoTools {
                                                    const geo::PlaneID::PlaneID_t plane,
                                                    const art::Event& Event,
                                                    const bool applyNormalization = false,
+                                                   const bool applyMCLifetimeCorrection = false,
                                                    const HitsToSpacePoints& hitsToSpacePoints = HitsToSpacePoints{},
                                                    const geo::Vector_t& showerPCADir = geo::Vector_t{0, 0, 0}) const
   {
@@ -214,46 +218,31 @@ namespace ShowerRecoTools {
       return 1;
     }
 
-    double totalCharge = 0;
     double totalEnergy = 0;
     double correctedtotalCharge = 0;
     double nElectrons = 0;
-    double totalChargePos = 0;
-    geo::Point_t chargeWeightedPosition = {0, 0, 0}; // Initialize charge weighted position
 
     for (auto const& hit : hits) {
-      totalCharge +=
-        hit->Integral() *
-        fCalorimetryAlg.LifetimeCorrection(
-          clockData, detProp, hit->PeakTime()); // obtain charge and correct for lifetime
-        
-          if ( applyNormalization ) {
-            HitsToSpacePoints::const_iterator hIter = hitsToSpacePoints.find(hit);
-            if (hitsToSpacePoints.end() != hIter){
-              const art::Ptr<recob::SpacePoint> spacepoint = hIter->second;            
-              auto const& pos = spacepoint->position();  // this is a geo::Point_t
-              chargeWeightedPosition += geo::Vector_t{pos.X(), pos.Y(), pos.Z()} * hit->Integral();
-              totalChargePos += hit->Integral(); // Accumulate total charge
-            }
+
+      double hitCharge = 0;
+      if (applyMCLifetimeCorrection) {
+        hitCharge = hit->Integral() * fCalorimetryAlg.LifetimeCorrection(clockData, detProp, hit->PeakTime());
+      } else {
+        hitCharge = hit->Integral();
+      }
+
+      hitCharge /= fRecombinationFactor;
+
+      if ( applyNormalization ) {
+        HitsToSpacePoints::const_iterator hIter = hitsToSpacePoints.find(hit);
+        if (hitsToSpacePoints.end() != hIter) {
+          const art::Ptr<recob::SpacePoint> spacepoint = hIter->second;
+          hitCharge = Normalize(hitCharge, Event, *hit, spacepoint->position(), showerPCADir, 0);
         }
-    }
+        // hits without spacepoints contribute uncorrected charge
+      }
 
-    // correct charge due to recombination
-    correctedtotalCharge = totalCharge / fRecombinationFactor;
-
-    //std::cout << "Applying normalization: " << applyNormalization << std::endl;
-
-    // apply normalization if needed
-    if ( applyNormalization && hits.size() > 0 ) {
-      //std::cout << "\t" << "Total charge before norm: " << correctedtotalCharge << std::endl;
-      if (totalChargePos > 0) chargeWeightedPosition /= totalChargePos; // Normalize by total charge
-      correctedtotalCharge = Normalize( correctedtotalCharge,
-        Event,
-        *hits.at(0),
-        chargeWeightedPosition,
-        showerPCADir,
-        0 );
-      //std::cout << "\t" << "Total charge after norm: " << correctedtotalCharge << std::endl;
+      correctedtotalCharge += hitCharge;
     }
     // calculate # of electrons and the corresponding energy
     nElectrons = fCalorimetryAlg.ElectronsFromADCArea(correctedtotalCharge, plane);
