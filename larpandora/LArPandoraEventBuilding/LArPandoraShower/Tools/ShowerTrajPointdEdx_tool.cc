@@ -138,7 +138,6 @@ namespace ShowerRecoTools {
 
       int tCounter = 0;
       for ( auto const& tool_pset : tool_psets ) {
-        //std::cout << "pushing back tools..." << tCounter << std::endl;
         tCounter++;
 	      fNormalizationTools.push_back( art::make_tool<INormalizeCharge>(tool_pset) );
       }
@@ -351,7 +350,6 @@ namespace ShowerRecoTools {
       // Attempt the normalization //Ivan
       double dQdxNorm = dQdx;
       if ( fApplyCorrectionsInNorm ) {
-        //std::cout << "Running the CorrectionsInNorm for showers" << std::endl;
 	      dQdxNorm = Normalize( dQdx,
 			    Event,
 			    *hit,
@@ -359,8 +357,6 @@ namespace ShowerRecoTools {
 			    InitialTrack.DirectionAtPoint(index),
 			    pfpT0Time );
       }
-
-      //std::cout << "Traj Point: dQdx: " << dQdx << " dQdxNorm: " << dQdxNorm << std::endl;
 
       double dEdx = fCalorimetryAlg.dEdx_AREA(
         clockData, detProp, dQdxNorm, hit->PeakTime(), planeid.Plane, pfpT0Time, localEField);
@@ -547,17 +543,16 @@ namespace ShowerRecoTools {
     return;
   }
   
-  const double ShowerTrajPointdEdx::Normalize(const double dQdx,
+  const double ShowerTrajPointdEdx::Normalize(double dQdx,
 					const art::Event& e,
 					const recob::Hit& h,
 					const geo::Point_t& location,
 					const geo::Vector_t& direction,
-					const double t0)
+					const double t0) const
   {
     double ret = dQdx;
     for (auto const& nt : fNormalizationTools) {
       ret = nt->Normalize(ret, e, h, location, direction, t0);
-      //std::cout << "\t norm: dQdx = " << ret << std::endl;
     }
     
     return ret;

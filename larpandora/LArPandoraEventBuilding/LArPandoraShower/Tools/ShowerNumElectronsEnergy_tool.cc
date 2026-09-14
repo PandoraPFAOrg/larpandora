@@ -56,7 +56,7 @@ namespace ShowerRecoTools {
                            const geo::Vector_t& showerPCADir) const;
 
     // Normalization function
-    double Normalize(const double dQdx,
+    const double Normalize(double dQdx,
 		     const art::Event& e,
 		     const recob::Hit& h,
 		     const geo::Point_t& location,
@@ -98,7 +98,6 @@ namespace ShowerRecoTools {
 
       int tCounter = 0;
       for ( auto const& tool_pset : tool_psets ) {
-        //std::cout << "pushing back tools..." << tCounter << std::endl;
         tCounter++;
 	      fNormalizationTools.push_back( art::make_tool<INormalizeCharge>(tool_pset) );
       }
@@ -140,7 +139,10 @@ namespace ShowerRecoTools {
     SpacePointVector spacePointVector;
     SpacePointsToHits spacePointsToHits;
     HitsToSpacePoints hitsToSpacePoints;
-    LArPandoraHelper::CollectSpacePoints(Event, fPFParticleLabel.label(), spacePointVector, spacePointsToHits, hitsToSpacePoints);
+
+    if (fApplyCorrectionsInNorm) {
+      LArPandoraHelper::CollectSpacePoints(Event, fPFParticleLabel.label(), spacePointVector, spacePointsToHits, hitsToSpacePoints);
+    }
 
     // Setup normalization tools
     for (auto const& nt : fNormalizationTools)
@@ -213,9 +215,10 @@ namespace ShowerRecoTools {
 
     if (applyNormalization && hitsToSpacePoints.empty()) {
       if (fVerbose) {
-          mf::LogError("ShowerNumElectronsEnergy") << "No hits to space points mapping provided, returning " << std::endl;
+          mf::LogError("ShowerNumElectronsEnergy") << "No hits to space points mapping provided while requesting normalization, returning error energy value -999" << std::endl;
+
       }
-      return 1;
+      return -999;
     }
 
     double totalEnergy = 0;
@@ -260,7 +263,6 @@ namespace ShowerRecoTools {
     double ret = dQdx;
     for (auto const& nt : fNormalizationTools) {
       ret = nt->Normalize(ret, e, h, location, direction, t0);
-      //std::cout << "\t norm: dQdx = " << ret << std::endl;
     }
     
     return ret;
