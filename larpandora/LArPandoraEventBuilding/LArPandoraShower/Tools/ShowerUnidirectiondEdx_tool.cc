@@ -44,11 +44,11 @@ namespace ShowerRecoTools {
 
     // Normalization function
     const double Normalize(double dQdx,
-		     const art::Event& e,
-		     const recob::Hit& h,
-		     const geo::Point_t& location,
-		     const geo::Vector_t& direction,
-		     const double t0) const;
+         const art::Event& e,
+         const recob::Hit& h,
+         const geo::Point_t& location,
+         const geo::Vector_t& direction,
+         const double t0) const;
 
     //Define the services and algorithms
     art::ServiceHandle<geo::Geometry> fGeom;
@@ -97,7 +97,7 @@ namespace ShowerRecoTools {
       int tCounter = 0;
       for ( auto const& tool_pset : tool_psets ) {
         tCounter++;
-	      fNormalizationTools.push_back( art::make_tool<INormalizeCharge>(tool_pset) );
+        fNormalizationTools.push_back( art::make_tool<INormalizeCharge>(tool_pset) );
       }
     }
   }
@@ -329,11 +329,11 @@ namespace ShowerRecoTools {
   }
 
   const double ShowerUnidirectiondEdx::Normalize(const double dQdx,
-					const art::Event& e,
-					const recob::Hit& h,
-					const geo::Point_t& location,
-					const geo::Vector_t& direction,
-					const double t0)
+          const art::Event& e,
+          const recob::Hit& h,
+          const geo::Point_t& location,
+          const geo::Vector_t& direction,
+          const double t0)
   {
     double ret = dQdx;
     for (auto const& nt : fNormalizationTools) {

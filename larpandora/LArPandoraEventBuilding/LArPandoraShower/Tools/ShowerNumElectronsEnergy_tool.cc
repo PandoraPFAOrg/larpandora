@@ -57,11 +57,11 @@ namespace ShowerRecoTools {
 
     // Normalization function
     const double Normalize(double dQdx,
-		     const art::Event& e,
-		     const recob::Hit& h,
-		     const geo::Point_t& location,
-		     const geo::Vector_t& direction,
-		     const double t0) const;
+         const art::Event& e,
+         const recob::Hit& h,
+         const geo::Point_t& location,
+         const geo::Vector_t& direction,
+         const double t0) const;
 
     art::InputTag fPFParticleLabel;
     int fVerbose;
@@ -99,7 +99,7 @@ namespace ShowerRecoTools {
       int tCounter = 0;
       for ( auto const& tool_pset : tool_psets ) {
         tCounter++;
-	      fNormalizationTools.push_back( art::make_tool<INormalizeCharge>(tool_pset) );
+        fNormalizationTools.push_back( art::make_tool<INormalizeCharge>(tool_pset) );
       }
     }
   }
@@ -254,11 +254,11 @@ namespace ShowerRecoTools {
   }
 
   double ShowerNumElectronsEnergy::Normalize(const double dQdx,
-					const art::Event& e,
-					const recob::Hit& h,
-					const geo::Point_t& location,
-					const geo::Vector_t& direction,
-					const double t0) const
+          const art::Event& e,
+          const recob::Hit& h,
+          const geo::Point_t& location,
+          const geo::Vector_t& direction,
+          const double t0) const
   {
     double ret = dQdx;
     for (auto const& nt : fNormalizationTools) {
