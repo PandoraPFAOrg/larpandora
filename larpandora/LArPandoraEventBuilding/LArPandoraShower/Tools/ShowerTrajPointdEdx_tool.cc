@@ -49,12 +49,12 @@ namespace ShowerRecoTools {
 
   private:
     // Normalization function
-    const double Normalize(const double dQdx,
+    const double Normalize(double dQdx,
          const art::Event& e,
          const recob::Hit& h,
          const geo::Point_t& location,
          const geo::Vector_t& direction,
-         const double t0);
+         const double t0) const;
 
     //Servcies and Algorithms
     art::ServiceHandle<geo::Geometry> fGeom;

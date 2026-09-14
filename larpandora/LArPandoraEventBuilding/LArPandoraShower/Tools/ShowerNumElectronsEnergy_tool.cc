@@ -257,7 +257,7 @@ namespace ShowerRecoTools {
     return totalEnergy;
   }
 
-  double ShowerNumElectronsEnergy::Normalize(const double dQdx,
+  const double ShowerNumElectronsEnergy::Normalize(double dQdx,
           const art::Event& e,
           const recob::Hit& h,
           const geo::Point_t& location,
