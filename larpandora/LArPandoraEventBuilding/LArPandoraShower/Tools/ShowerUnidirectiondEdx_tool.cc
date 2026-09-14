@@ -43,12 +43,12 @@ namespace ShowerRecoTools {
   private:
 
     // Normalization function
-    const double Normalize(const double dQdx,
-		     const art::Event& e,
-		     const recob::Hit& h,
-		     const geo::Point_t& location,
-		     const geo::Vector_t& direction,
-		     const double t0);
+    const double Normalize(double dQdx,
+         const art::Event& e,
+         const recob::Hit& h,
+         const geo::Point_t& location,
+         const geo::Vector_t& direction,
+         const double t0) const;
 
     //Define the services and algorithms
     art::ServiceHandle<geo::Geometry> fGeom;
@@ -97,9 +97,8 @@ namespace ShowerRecoTools {
 
       int tCounter = 0;
       for ( auto const& tool_pset : tool_psets ) {
-        //std::cout << "pushing back tools..." << tCounter << std::endl;
         tCounter++;
-	      fNormalizationTools.push_back( art::make_tool<INormalizeCharge>(tool_pset) );
+        fNormalizationTools.push_back( art::make_tool<INormalizeCharge>(tool_pset) );
       }
     }
   }
@@ -115,7 +114,6 @@ namespace ShowerRecoTools {
     SpacePointsToHits spacePointsToHits;
     HitsToSpacePoints hitsToSpacePoints;
     LArPandoraHelper::CollectSpacePoints(Event, fPFParticleLabel.label(), spacePointVector, spacePointsToHits, hitsToSpacePoints);
-    // std::cout << "There are " << hitsToSpacePoints.size() << " hits associated with space points" << std::endl;
 
     // Shower dEdx calculation
     if (!ShowerEleHolder.CheckElement(fShowerStartPositionInputLabel)) {
@@ -139,10 +137,6 @@ namespace ShowerRecoTools {
     for (auto const& nt : fNormalizationTools)
       nt->setup(Event);
 
-    // auto const pfpHandle = Event.getValidHandle<std::vector<recob::PFParticle>>(fPFParticleLabel);
-    // const art::FindManyP<recob::SpacePoint>& fmspp =
-    //  ShowerEleHolder.GetFindManyP<recob::SpacePoint>(pfpHandle, Event, fPFParticleLabel);
-
     //Get the initial track hits
     std::vector<art::Ptr<recob::Hit>> trackhits;
     ShowerEleHolder.GetElement(fInitialTrackHitsInputLabel, trackhits);
@@ -161,11 +155,6 @@ namespace ShowerRecoTools {
 
     geo::Vector_t showerPCADir = {-999, -999, -999};
     ShowerEleHolder.GetElement("ShowerDirection", showerPCADir);
-
-    //std::cout << "Shower direction from PCA: " << showerPCADir.X() << " " << showerPCADir.Y() << " " << showerPCADir.Z() << std::endl;
-
-    //std::cout << TString(Form("Shower position %f %f %f, and direction %f %f %f", ShowerStartPosition.X(), ShowerStartPosition.Y(), ShowerStartPosition.Z(),
-    //                      showerDir.X(), showerDir.Y(), showerDir.Z())) << std::endl;
 
     geo::TPCID vtxTPC = fGeom->FindTPCAtPosition(geo::vect::toPoint(ShowerStartPosition));
 
@@ -251,26 +240,14 @@ namespace ShowerRecoTools {
               totQ += hit->Integral();
               avgT += hit->PeakTime();
               ++nhits;
-              
-              //std::cout << "There are " << fmspp.size() << " spacepoint collections" << std::endl;
-
-              /*if (fmspp.size() <= hit.key()) {
-                std::cout << "No spacepoints for this hit" << std::endl;
-                continue;
-              }
-              std::vector<art::Ptr<recob::SpacePoint>> sps = fmspp.at(hit.key());
-              std::cout << "Found " << sps.size() << " spacepoints for this hit." << std::endl;*/
 
               HitsToSpacePoints::const_iterator hIter = hitsToSpacePoints.find(hit);
               if (hitsToSpacePoints.end() != hIter){
                 const art::Ptr<recob::SpacePoint> spacepoint = hIter->second;
-                //const double X(spacepoint->XYZ()[0]);
-                //std::cout << "Found spacepoint at X: " << X << std::endl;
 
                 auto const& pos = spacepoint->position();  // this is a geo::Point_t
                 chargeWeightedPosition += geo::Vector_t{pos.X(), pos.Y(), pos.Z()} * q;
                 totalCharge += q; // Accumulate total charge
-                //std::cout << "updating charge weighted position with q: " << q << std::endl;
               }
 
             }
@@ -279,8 +256,6 @@ namespace ShowerRecoTools {
           // Calculate the final charge weighted average position
           if (totalCharge > 0) {
             chargeWeightedPosition /= totalCharge; // Normalize by total charge
-            // std::cout << "Charge weighted position: (" << chargeWeightedPosition.X() << ", "
-            //           << chargeWeightedPosition.Y() << ", " << chargeWeightedPosition.Z() << ")" << std::endl;
           }
 
           if (totQ) {
@@ -291,15 +266,12 @@ namespace ShowerRecoTools {
             }
 
             //Get the median and calculate the dEdx using the algorithm.
-
             if (vQ.size() > 0) {
               double dQdx = TMath::Median(vQ.size(), &vQ[0]) / pitch;
               const auto& hit = trackPlaneHits.at(0);
               double dQdxNorm = dQdx;
               // Attempt the normalization //Mike 
               if ( fApplyCorrectionsInNorm ) {
-                //geo::Vector_t displacement(0, 0, 0);
-                //std::cout << "Running the CorrectionsInNorm for showers" << std::endl;
                 dQdxNorm = Normalize( dQdx,
                   Event,
                   *hit,
@@ -307,7 +279,6 @@ namespace ShowerRecoTools {
                   showerPCADir,
                   0 );
               }
-              //std::cout << "Unidirection: dQdx: " << dQdx << " dQdxNorm: " << dQdxNorm << std::endl;
 
               dEdx = fCalorimetryAlg.dEdx_AREA(
                 clockData, detProp, dQdxNorm, avgT / nhits, trackPlaneHits.at(0)->WireID().Plane);
@@ -359,16 +330,15 @@ namespace ShowerRecoTools {
   }
 
   const double ShowerUnidirectiondEdx::Normalize(const double dQdx,
-					const art::Event& e,
-					const recob::Hit& h,
-					const geo::Point_t& location,
-					const geo::Vector_t& direction,
-					const double t0)
+          const art::Event& e,
+          const recob::Hit& h,
+          const geo::Point_t& location,
+          const geo::Vector_t& direction,
+          const double t0)
   {
     double ret = dQdx;
     for (auto const& nt : fNormalizationTools) {
       ret = nt->Normalize(ret, e, h, location, direction, t0);
-      //std::cout << "\t norm: dQdx = " << ret << std::endl;
     }
     
     return ret;
