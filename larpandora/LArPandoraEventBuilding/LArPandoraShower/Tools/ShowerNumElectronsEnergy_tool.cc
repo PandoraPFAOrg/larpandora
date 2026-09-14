@@ -121,7 +121,11 @@ namespace ShowerRecoTools {
     auto const clusHandle = Event.getValidHandle<std::vector<recob::Cluster>>(fPFParticleLabel);
 
     geo::Vector_t showerPCADir = {-999, -999, -999};
-    ShowerEleHolder.GetElement("ShowerDirection", showerPCADir);
+    if (fApplyCorrectionsInNorm && ShowerEleHolder.GetElement("ShowerDirection", showerPCADir) != 0) {
+      mf::LogError("ShowerNumElectronsEnergy")
+        << "ShowerDirection not available but normalization requested, skipping energy calculation";
+      return 1;
+    }
 
     const art::FindManyP<recob::Cluster>& fmc =
       ShowerEleHolder.GetFindManyP<recob::Cluster>(pfpHandle, Event, fPFParticleLabel);
