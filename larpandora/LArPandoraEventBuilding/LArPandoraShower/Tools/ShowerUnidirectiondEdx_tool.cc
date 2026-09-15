@@ -82,7 +82,7 @@ namespace ShowerRecoTools {
     , fMaxHitPlane(pset.get<bool>("MaxHitPlane"))
     , fMissFirstPoint(pset.get<bool>("MissFirstPoint"))
     , fSumHitSnippets(pset.get<bool>("SumHitSnippets"))
-    , fApplyCorrectionsInNorm(pset.get<bool>("ApplyCorrectionsInNorm"))
+    , fApplyCorrectionsInNorm(pset.get<bool>("ApplyCorrectionsInNorm", false))
     , fShowerStartPositionInputLabel(pset.get<std::string>("ShowerStartPositionInputLabel"))
     , fInitialTrackHitsInputLabel(pset.get<std::string>("InitialTrackHitsInputLabel"))
     , fShowerDirectionInputLabel(pset.get<std::string>("ShowerDirectionInputLabel"))

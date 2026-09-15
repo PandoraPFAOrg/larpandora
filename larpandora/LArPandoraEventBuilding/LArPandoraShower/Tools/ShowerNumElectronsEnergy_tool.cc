@@ -90,8 +90,8 @@ namespace ShowerRecoTools {
     , fShowerBestPlaneOutputLabel(pset.get<std::string>("ShowerBestPlaneOutputLabel"))
     , fCalorimetryAlg(pset.get<fhicl::ParameterSet>("CalorimetryAlg"))
     , fRecombinationFactor(pset.get<double>("RecombinationFactor"))
-    , fApplyCorrectionsInNorm(pset.get<bool>("ApplyCorrectionsInNorm"))
-    , fApplyMCLifetimeCorrection(pset.get<bool>("ApplyMCLifetimeCorrection"))
+    , fApplyCorrectionsInNorm(pset.get<bool>("ApplyCorrectionsInNorm", false))
+    , fApplyMCLifetimeCorrection(pset.get<bool>("ApplyMCLifetimeCorrection", true))
   {
     if ( fApplyCorrectionsInNorm ) {
       auto tool_psets = pset.get< std::vector< fhicl::ParameterSet > >("NormTools");
