@@ -18,6 +18,16 @@
 #include "larpandora/LArPandoraEventBuilding/LArPandoraShower/Tools/IShowerTool.h"
 #include "larreco/Calorimetry/CalorimetryAlg.h"
 
+// For Calorimetry normalization
+#include "art/Utilities/make_tool.h"
+#include "larreco/Calorimetry/INormalizeCharge.h"
+
+#include "larpandora/LArPandoraInterface/LArPandoraHelper.h"
+#include "lardataobj/RecoBase/SpacePoint.h"
+#include "lardataobj/RecoBase/PFParticle.h"
+
+using namespace lar_pandora;
+
 namespace ShowerRecoTools {
 
   class ShowerUnidirectiondEdx : IShowerTool {
@@ -31,10 +41,21 @@ namespace ShowerRecoTools {
                          reco::shower::ShowerElementHolder& ShowerEleHolder) override;
 
   private:
+
+    // Normalization function
+    const double Normalize(double dQdx,
+         const art::Event& e,
+         const recob::Hit& h,
+         const geo::Point_t& location,
+         const geo::Vector_t& direction,
+         const double t0) const ;
+
     //Define the services and algorithms
     art::ServiceHandle<geo::Geometry> fGeom;
     geo::WireReadoutGeom const& fChannelMap = art::ServiceHandle<geo::WireReadout>()->Get();
     calo::CalorimetryAlg fCalorimetryAlg;
+
+    std::vector< std::unique_ptr<INormalizeCharge> > fNormalizationTools;
 
     //fcl parameters.
     int fVerbose;
@@ -43,11 +64,14 @@ namespace ShowerRecoTools {
     bool fMaxHitPlane;    //Set the best planes as the one with the most hits
     bool fMissFirstPoint; //Do not use any hits from the first wire.
     bool fSumHitSnippets; // Whether to treat hits individually or only one hit per snippet
+    bool fApplyCorrectionsInNorm; // Whether to instead apply calorimetry corrections in norm.
+
     std::string fShowerStartPositionInputLabel;
     std::string fInitialTrackHitsInputLabel;
     std::string fShowerDirectionInputLabel;
     std::string fShowerdEdxOutputLabel;
     std::string fShowerBestPlaneOutputLabel;
+    art::InputTag fPFParticleLabel;
   };
 
   ShowerUnidirectiondEdx::ShowerUnidirectiondEdx(const fhicl::ParameterSet& pset)
@@ -58,12 +82,26 @@ namespace ShowerRecoTools {
     , fMaxHitPlane(pset.get<bool>("MaxHitPlane"))
     , fMissFirstPoint(pset.get<bool>("MissFirstPoint"))
     , fSumHitSnippets(pset.get<bool>("SumHitSnippets"))
+    , fApplyCorrectionsInNorm(pset.get<bool>("ApplyCorrectionsInNorm", false))
     , fShowerStartPositionInputLabel(pset.get<std::string>("ShowerStartPositionInputLabel"))
     , fInitialTrackHitsInputLabel(pset.get<std::string>("InitialTrackHitsInputLabel"))
+    //, fInitialTrackInputLabel(pset.get<std::string>("InitialTrackInputLabel"))
     , fShowerDirectionInputLabel(pset.get<std::string>("ShowerDirectionInputLabel"))
     , fShowerdEdxOutputLabel(pset.get<std::string>("ShowerdEdxOutputLabel"))
     , fShowerBestPlaneOutputLabel(pset.get<std::string>("ShowerBestPlaneOutputLabel"))
-  {}
+    , fPFParticleLabel(pset.get<std::string>("PFParticleLabel"))
+
+  {
+    if ( fApplyCorrectionsInNorm ) {
+      auto tool_psets = pset.get< std::vector< fhicl::ParameterSet > >("NormTools");
+
+      int tCounter = 0;
+      for ( auto const& tool_pset : tool_psets ) {
+        tCounter++;
+        fNormalizationTools.push_back( art::make_tool<INormalizeCharge>(tool_pset) );
+      }
+    }
+  }
 
   int ShowerUnidirectiondEdx::CalculateElement(const art::Ptr<recob::PFParticle>& pfparticle,
                                                art::Event& Event,
@@ -71,6 +109,11 @@ namespace ShowerRecoTools {
   {
 
     dEdxTrackLength = fdEdxTrackLength;
+
+    SpacePointVector spacePointVector;
+    SpacePointsToHits spacePointsToHits;
+    HitsToSpacePoints hitsToSpacePoints;
+    LArPandoraHelper::CollectSpacePoints(Event, fPFParticleLabel.label(), spacePointVector, spacePointsToHits, hitsToSpacePoints);
 
     // Shower dEdx calculation
     if (!ShowerEleHolder.CheckElement(fShowerStartPositionInputLabel)) {
@@ -90,6 +133,10 @@ namespace ShowerRecoTools {
       return 1;
     }
 
+    // Setup normalization tools
+    for (auto const& nt : fNormalizationTools)
+      nt->setup(Event);
+
     //Get the initial track hits
     std::vector<art::Ptr<recob::Hit>> trackhits;
     ShowerEleHolder.GetElement(fInitialTrackHitsInputLabel, trackhits);
@@ -105,6 +152,9 @@ namespace ShowerRecoTools {
 
     geo::Vector_t showerDir = {-999, -999, -999};
     ShowerEleHolder.GetElement(fShowerDirectionInputLabel, showerDir);
+
+    geo::Vector_t showerPCADir = {-999, -999, -999};
+    ShowerEleHolder.GetElement("ShowerDirection", showerPCADir);
 
     geo::TPCID vtxTPC = fGeom->FindTPCAtPosition(geo::vect::toPoint(ShowerStartPosition));
 
@@ -166,6 +216,9 @@ namespace ShowerRecoTools {
           //Get the first wire
           int w0 = trackPlaneHits.at(0)->WireID().Wire;
 
+          geo::Point_t chargeWeightedPosition = {0, 0, 0}; // Initialize charge weighted position
+          double totalCharge = 0; // Initialize total charge
+
           for (auto const& hit : trackPlaneHits) {
 
             if (fSumHitSnippets && !hitSnippets.count(hit)) continue;
@@ -174,7 +227,7 @@ namespace ShowerRecoTools {
             int w1 = hit->WireID().Wire;
             if (fMissFirstPoint && w0 == w1) { continue; }
 
-            //Ignore hits that are too far away.
+            // Ignore hits that are too far away.
             if (std::abs((w1 - w0) * pitch) < dEdxTrackLength) {
 
               double q = hit->Integral();
@@ -187,7 +240,22 @@ namespace ShowerRecoTools {
               totQ += hit->Integral();
               avgT += hit->PeakTime();
               ++nhits;
+
+              HitsToSpacePoints::const_iterator hIter = hitsToSpacePoints.find(hit);
+              if (hitsToSpacePoints.end() != hIter){
+                const art::Ptr<recob::SpacePoint> spacepoint = hIter->second;
+
+                auto const& pos = spacepoint->position();  // this is a geo::Point_t
+                chargeWeightedPosition += geo::Vector_t{pos.X(), pos.Y(), pos.Z()} * q;
+                totalCharge += q; // Accumulate total charge
+              }
+
             }
+          }
+
+          // Calculate the final charge weighted average position
+          if (totalCharge > 0) {
+            chargeWeightedPosition /= totalCharge; // Normalize by total charge
           }
 
           if (totQ) {
@@ -198,9 +266,23 @@ namespace ShowerRecoTools {
             }
 
             //Get the median and calculate the dEdx using the algorithm.
-            double dQdx = TMath::Median(vQ.size(), &vQ[0]) / pitch;
-            dEdx = fCalorimetryAlg.dEdx_AREA(
-              clockData, detProp, dQdx, avgT / nhits, trackPlaneHits.at(0)->WireID().Plane);
+            if (vQ.size() > 0) {
+              double dQdx = TMath::Median(vQ.size(), &vQ[0]) / pitch;
+              const auto& hit = trackPlaneHits.at(0);
+              double dQdxNorm = dQdx;
+              // Attempt the normalization //Mike 
+              if ( fApplyCorrectionsInNorm ) {
+                dQdxNorm = Normalize( dQdx,
+                  Event,
+                  *hit,
+                  chargeWeightedPosition,
+                  showerPCADir,
+                  0 );
+              }
+
+              dEdx = fCalorimetryAlg.dEdx_AREA(
+                clockData, detProp, dQdxNorm, avgT / nhits, trackPlaneHits.at(0)->WireID().Plane);
+            }
 
             if (isinf(dEdx)) { dEdx = -999; };
 
@@ -245,6 +327,21 @@ namespace ShowerRecoTools {
     }
 
     return 0;
+  }
+
+  const double ShowerUnidirectiondEdx::Normalize(double dQdx,
+          const art::Event& e,
+          const recob::Hit& h,
+          const geo::Point_t& location,
+          const geo::Vector_t& direction,
+          const double t0) const
+  {
+    double ret = dQdx;
+    for (auto const& nt : fNormalizationTools) {
+      ret = nt->Normalize(ret, e, h, location, direction, t0);
+    }
+    
+    return ret;
   }
 }
 

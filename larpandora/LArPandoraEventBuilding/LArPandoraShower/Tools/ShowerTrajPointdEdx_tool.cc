@@ -29,6 +29,10 @@
 
 using ROOT::Math::VectorUtil::Angle;
 
+// For Calorimetry normalization
+#include "art/Utilities/make_tool.h"
+#include "larreco/Calorimetry/INormalizeCharge.h"
+
 namespace ShowerRecoTools {
 
   class ShowerTrajPointdEdx : IShowerTool {
@@ -44,10 +48,20 @@ namespace ShowerRecoTools {
     void FinddEdxLength(std::vector<double>& dEdx_vec, std::vector<double>& dEdx_val);
 
   private:
+    // Normalization function
+    const double Normalize(double dQdx,
+         const art::Event& e,
+         const recob::Hit& h,
+         const geo::Point_t& location,
+         const geo::Vector_t& direction,
+         const double t0) const;
+
     //Servcies and Algorithms
     art::ServiceHandle<geo::Geometry> fGeom;
     geo::WireReadoutGeom const& fChannelMap = art::ServiceHandle<geo::WireReadout>()->Get();
     calo::CalorimetryAlg fCalorimetryAlg;
+
+    std::vector< std::unique_ptr<INormalizeCharge> > fNormalizationTools;
 
     //fcl parameters
     float fMinAngleToWire; //Minimum angle between the wire direction and the shower
@@ -71,9 +85,9 @@ namespace ShowerRecoTools {
     bool
       fSCECorrectEField; //Whether to use the local electric field, from SpaceChargeService, in recombination calc.
     bool
-      fSCEInputCorrected; //Whether the input has already been corrected for spatial SCE distortions
-
-    bool fSumHitSnippets; //Whether to treat hits individually or only one hit per snippet
+      fSCEInputCorrected; // Whether the input has already been corrected for spatial SCE distortions
+    bool fSumHitSnippets; // Whether to treat hits individually or only one hit per snippet
+    bool fApplyCorrectionsInNorm; // Whether to instead apply calorimetry corrections in norm.
     int
       fResultsOverrideMode; //How results from a previous tool writing on the same tool are overridden
     //0: always override previous results
@@ -108,6 +122,7 @@ namespace ShowerRecoTools {
     , fSCECorrectEField(pset.get<bool>("SCECorrectEField"))
     , fSCEInputCorrected(pset.get<bool>("SCEInputCorrected"))
     , fSumHitSnippets(pset.get<bool>("SumHitSnippets"))
+    , fApplyCorrectionsInNorm(pset.get<bool>("ApplyCorrectionsInNorm", false))
     , fResultsOverrideMode(pset.get<int>("ResultsOverrideMode"))
     , fPFParticleLabel(pset.get<art::InputTag>("PFParticleLabel"))
     , fVerbose(pset.get<int>("Verbose"))
@@ -122,6 +137,16 @@ namespace ShowerRecoTools {
     if ((fSCECorrectPitch || fSCECorrectEField) && !fSCEInputCorrected) {
       throw cet::exception("ShowerTrajPointdEdx")
         << "Can only correct for SCE if input is already corrected" << std::endl;
+    }
+
+    if ( fApplyCorrectionsInNorm ) {
+      auto tool_psets = pset.get< std::vector< fhicl::ParameterSet > >("NormTools");
+
+      int tCounter = 0;
+      for ( auto const& tool_pset : tool_psets ) {
+        tCounter++;
+        fNormalizationTools.push_back( art::make_tool<INormalizeCharge>(tool_pset) );
+      }
     }
   }
 
@@ -162,6 +187,10 @@ namespace ShowerRecoTools {
 
     // Get the spacepoints
     auto const spHandle = Event.getValidHandle<std::vector<recob::SpacePoint>>(fPFParticleLabel);
+
+    // Setup normalization tools
+    for (auto const& nt : fNormalizationTools)
+      nt->setup(Event);
 
     // Get the hits associated with the space points
     const art::FindManyP<recob::Hit>& fmsp =
@@ -323,8 +352,20 @@ namespace ShowerRecoTools {
       if (fSCECorrectEField) {
         localEField = IShowerTool::GetLArPandoraShowerAlg().SCECorrectEField(localEField, pos);
       }
+
+      // Attempt the normalization //Ivan
+      double dQdxNorm = dQdx;
+      if ( fApplyCorrectionsInNorm ) {
+        dQdxNorm = Normalize( dQdx,
+          Event,
+          *hit,
+          InitialTrack.LocationAtPoint(index),
+          InitialTrack.DirectionAtPoint(index),
+          pfpT0Time );
+      }
+
       double dEdx = fCalorimetryAlg.dEdx_AREA(
-        clockData, detProp, dQdx, hit->PeakTime(), planeid.Plane, pfpT0Time, localEField);
+        clockData, detProp, dQdxNorm, hit->PeakTime(), planeid.Plane, pfpT0Time, localEField);
 
       //Add the value to the dEdx
       dEdx_vec[planeid.Plane].push_back(dEdx);
@@ -587,6 +628,21 @@ namespace ShowerRecoTools {
       }
     }
     return;
+  }
+  
+  const double ShowerTrajPointdEdx::Normalize(double dQdx,
+          const art::Event& e,
+          const recob::Hit& h,
+          const geo::Point_t& location,
+          const geo::Vector_t& direction,
+          const double t0) const
+  {
+    double ret = dQdx;
+    for (auto const& nt : fNormalizationTools) {
+      ret = nt->Normalize(ret, e, h, location, direction, t0);
+    }
+    
+    return ret;
   }
 
 }
