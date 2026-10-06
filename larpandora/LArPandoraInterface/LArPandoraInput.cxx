@@ -122,7 +122,7 @@ namespace lar_pandora {
           LArPandoraGeometry::GetVolumeID(driftVolumeMap, hit_WireID.Cryostat, hit_WireID.TPC);
         hitParameters.m_daughterVolumeId = LArPandoraGeometry::GetDaughterVolumeID(
           driftVolumeMap, hit_WireID.Cryostat, hit_WireID.TPC);
-        caloHitParameters.m_channelId = hit_WireID.Wire;
+        hitParameters.m_channelId = hit_WireID.Wire;
 
         if (hit_View == detType->TargetViewW(hit_WireID.TPC, hit_WireID.Cryostat)) {
           hitParameters.m_hitType = pandora::TPC_VIEW_W;
@@ -250,7 +250,7 @@ namespace lar_pandora {
         // ATTN: confirm the units
         hitParameters.m_startTime = static_cast<float>(opHit->StartTime());
         hitParameters.m_width = static_cast<float>(opHit->Width());
-        hitParameters.m_channel = channel;
+        hitParameters.m_channelId = channel;
       }
       catch (const pandora::StatusCodeException&) {
         mf::LogWarning("LArPandora")
