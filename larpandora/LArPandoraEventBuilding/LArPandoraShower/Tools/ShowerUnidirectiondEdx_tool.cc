@@ -22,9 +22,9 @@
 #include "art/Utilities/make_tool.h"
 #include "larreco/Calorimetry/INormalizeCharge.h"
 
-#include "larpandora/LArPandoraInterface/LArPandoraHelper.h"
-#include "lardataobj/RecoBase/SpacePoint.h"
 #include "lardataobj/RecoBase/PFParticle.h"
+#include "lardataobj/RecoBase/SpacePoint.h"
+#include "larpandora/LArPandoraInterface/LArPandoraHelper.h"
 
 using namespace lar_pandora;
 
@@ -41,7 +41,6 @@ namespace ShowerRecoTools {
                          reco::shower::ShowerElementHolder& ShowerEleHolder) override;
 
   private:
-
     // Normalize dQdx using the charge-weighted space point position of the used hits
     double NormalizedQdx(double dQdx,
                          const art::Event& e,
@@ -54,16 +53,16 @@ namespace ShowerRecoTools {
     geo::WireReadoutGeom const& fChannelMap = art::ServiceHandle<geo::WireReadout>()->Get();
     calo::CalorimetryAlg fCalorimetryAlg;
 
-    std::vector< std::unique_ptr<INormalizeCharge> > fNormalizationTools;
+    std::vector<std::unique_ptr<INormalizeCharge>> fNormalizationTools;
     HitsToSpacePoints fHitsToSpacePoints; // Filled per event when fApplyCorrectionsInNorm
 
     //fcl parameters.
     int fVerbose;
     double fdEdxTrackLength,
-      dEdxTrackLength;    //Max length from a hit can be to the start point in cm.
-    bool fMaxHitPlane;    //Set the best planes as the one with the most hits
-    bool fMissFirstPoint; //Do not use any hits from the first wire.
-    bool fSumHitSnippets; // Whether to treat hits individually or only one hit per snippet
+      dEdxTrackLength;            //Max length from a hit can be to the start point in cm.
+    bool fMaxHitPlane;            //Set the best planes as the one with the most hits
+    bool fMissFirstPoint;         //Do not use any hits from the first wire.
+    bool fSumHitSnippets;         // Whether to treat hits individually or only one hit per snippet
     bool fApplyCorrectionsInNorm; // Whether to instead apply calorimetry corrections in norm.
 
     std::string fShowerStartPositionInputLabel;
@@ -91,11 +90,11 @@ namespace ShowerRecoTools {
     , fPFParticleLabel(pset.get<std::string>("PFParticleLabel"))
 
   {
-    if ( fApplyCorrectionsInNorm ) {
-      auto tool_psets = pset.get< std::vector< fhicl::ParameterSet > >("NormTools");
+    if (fApplyCorrectionsInNorm) {
+      auto tool_psets = pset.get<std::vector<fhicl::ParameterSet>>("NormTools");
 
-      for ( auto const& tool_pset : tool_psets ) {
-        fNormalizationTools.push_back( art::make_tool<INormalizeCharge>(tool_pset) );
+      for (auto const& tool_pset : tool_psets) {
+        fNormalizationTools.push_back(art::make_tool<INormalizeCharge>(tool_pset));
       }
     }
   }

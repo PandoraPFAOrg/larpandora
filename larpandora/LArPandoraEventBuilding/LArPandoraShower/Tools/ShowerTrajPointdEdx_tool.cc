@@ -50,18 +50,18 @@ namespace ShowerRecoTools {
   private:
     // Normalization function
     const double Normalize(double dQdx,
-         const art::Event& e,
-         const recob::Hit& h,
-         const geo::Point_t& location,
-         const geo::Vector_t& direction,
-         const double t0) const;
+                           const art::Event& e,
+                           const recob::Hit& h,
+                           const geo::Point_t& location,
+                           const geo::Vector_t& direction,
+                           const double t0) const;
 
     //Servcies and Algorithms
     art::ServiceHandle<geo::Geometry> fGeom;
     geo::WireReadoutGeom const& fChannelMap = art::ServiceHandle<geo::WireReadout>()->Get();
     calo::CalorimetryAlg fCalorimetryAlg;
 
-    std::vector< std::unique_ptr<INormalizeCharge> > fNormalizationTools;
+    std::vector<std::unique_ptr<INormalizeCharge>> fNormalizationTools;
 
     //fcl parameters
     float fMinAngleToWire; //Minimum angle between the wire direction and the shower
@@ -86,7 +86,7 @@ namespace ShowerRecoTools {
       fSCECorrectEField; //Whether to use the local electric field, from SpaceChargeService, in recombination calc.
     bool
       fSCEInputCorrected; // Whether the input has already been corrected for spatial SCE distortions
-    bool fSumHitSnippets; // Whether to treat hits individually or only one hit per snippet
+    bool fSumHitSnippets;         // Whether to treat hits individually or only one hit per snippet
     bool fApplyCorrectionsInNorm; // Whether to instead apply calorimetry corrections in norm.
     int
       fResultsOverrideMode; //How results from a previous tool writing on the same tool are overridden
@@ -139,11 +139,11 @@ namespace ShowerRecoTools {
         << "Can only correct for SCE if input is already corrected" << std::endl;
     }
 
-    if ( fApplyCorrectionsInNorm ) {
-      auto tool_psets = pset.get< std::vector< fhicl::ParameterSet > >("NormTools");
+    if (fApplyCorrectionsInNorm) {
+      auto tool_psets = pset.get<std::vector<fhicl::ParameterSet>>("NormTools");
 
-      for ( auto const& tool_pset : tool_psets ) {
-        fNormalizationTools.push_back( art::make_tool<INormalizeCharge>(tool_pset) );
+      for (auto const& tool_pset : tool_psets) {
+        fNormalizationTools.push_back(art::make_tool<INormalizeCharge>(tool_pset));
       }
     }
   }
@@ -354,13 +354,13 @@ namespace ShowerRecoTools {
       }
 
       double dQdxNorm = dQdx;
-      if ( fApplyCorrectionsInNorm ) {
-        dQdxNorm = Normalize( dQdx,
-          Event,
-          *hit,
-          InitialTrack.LocationAtPoint(index),
-          InitialTrack.DirectionAtPoint(index),
-          pfpT0Time );
+      if (fApplyCorrectionsInNorm) {
+        dQdxNorm = Normalize(dQdx,
+                             Event,
+                             *hit,
+                             InitialTrack.LocationAtPoint(index),
+                             InitialTrack.DirectionAtPoint(index),
+                             pfpT0Time);
       }
 
       double dEdx = fCalorimetryAlg.dEdx_AREA(
@@ -628,19 +628,19 @@ namespace ShowerRecoTools {
     }
     return;
   }
-  
+
   const double ShowerTrajPointdEdx::Normalize(double dQdx,
-          const art::Event& e,
-          const recob::Hit& h,
-          const geo::Point_t& location,
-          const geo::Vector_t& direction,
-          const double t0) const
+                                              const art::Event& e,
+                                              const recob::Hit& h,
+                                              const geo::Point_t& location,
+                                              const geo::Vector_t& direction,
+                                              const double t0) const
   {
     double ret = dQdx;
     for (auto const& nt : fNormalizationTools) {
       ret = nt->Normalize(ret, e, h, location, direction, t0);
     }
-    
+
     return ret;
   }
 

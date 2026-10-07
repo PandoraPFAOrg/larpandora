@@ -23,9 +23,9 @@
 
 // For Calorimetry normalization
 #include "art/Utilities/make_tool.h"
-#include "larreco/Calorimetry/INormalizeCharge.h"
-#include "larpandora/LArPandoraInterface/LArPandoraHelper.h"
 #include "lardataobj/RecoBase/SpacePoint.h"
+#include "larpandora/LArPandoraInterface/LArPandoraHelper.h"
+#include "larreco/Calorimetry/INormalizeCharge.h"
 
 //C++ Includes
 #include <tuple>
@@ -53,7 +53,7 @@ namespace ShowerRecoTools {
 
     // Normalize the hit charge using its space point position and the shower direction
     double NormalizedHitCharge(const art::Event& e,
-                               double charge,                         
+                               double charge,
                                const art::Ptr<recob::Hit>& hit) const;
 
     art::InputTag fPFParticleLabel;
@@ -63,7 +63,7 @@ namespace ShowerRecoTools {
     std::string fShowerBestPlaneOutputLabel;
     std::string fShowerDirectionInputLabel;
 
-    std::vector< std::unique_ptr<INormalizeCharge> > fNormalizationTools;
+    std::vector<std::unique_ptr<INormalizeCharge>> fNormalizationTools;
     HitsToSpacePoints fHitsToSpacePoints; // Filled per event when fApplyCorrectionsInNorm
     geo::Vector_t fShowerDir;             // Filled per shower when fApplyCorrectionsInNorm
 
@@ -73,9 +73,8 @@ namespace ShowerRecoTools {
 
     // Declare stuff
     double fRecombinationFactor;
-    bool fApplyCorrectionsInNorm; // Whether to instead apply calorimetry corrections in norm.
+    bool fApplyCorrectionsInNorm;  // Whether to instead apply calorimetry corrections in norm.
     bool fApplyLifetimeCorrection; // Whether to apply MC lifetime correction
-
   };
 
   ShowerNumElectronsEnergy::ShowerNumElectronsEnergy(const fhicl::ParameterSet& pset)
@@ -90,11 +89,11 @@ namespace ShowerRecoTools {
     , fApplyCorrectionsInNorm(pset.get<bool>("ApplyCorrectionsInNorm"))
     , fApplyLifetimeCorrection(pset.get<bool>("ApplyLifetimeCorrection"))
   {
-    if ( fApplyCorrectionsInNorm ) {
-      auto tool_psets = pset.get< std::vector< fhicl::ParameterSet > >("NormTools");
+    if (fApplyCorrectionsInNorm) {
+      auto tool_psets = pset.get<std::vector<fhicl::ParameterSet>>("NormTools");
 
-      for ( auto const& tool_pset : tool_psets ) {
-        fNormalizationTools.push_back( art::make_tool<INormalizeCharge>(tool_pset) );
+      for (auto const& tool_pset : tool_psets) {
+        fNormalizationTools.push_back(art::make_tool<INormalizeCharge>(tool_pset));
       }
     }
   }
@@ -120,7 +119,8 @@ namespace ShowerRecoTools {
       fShowerDir = {-999, -999, -999};
       if (ShowerEleHolder.GetElement(fShowerDirectionInputLabel, fShowerDir) != 0) {
         mf::LogError("ShowerNumElectronsEnergy")
-          << "ShowerDirection not available but normalization requested, skipping energy calculation";
+          << "ShowerDirection not available but normalization requested, skipping energy "
+             "calculation";
         return 1;
       }
 
@@ -209,8 +209,10 @@ namespace ShowerRecoTools {
 
     if (fApplyCorrectionsInNorm && fHitsToSpacePoints.empty()) {
       if (fVerbose) {
-          mf::LogError("ShowerNumElectronsEnergy") << "No hits to space points mapping provided while requesting normalization, returning error energy value -999" << std::endl;
-
+        mf::LogError("ShowerNumElectronsEnergy")
+          << "No hits to space points mapping provided while requesting normalization, returning "
+             "error energy value -999"
+          << std::endl;
       }
       return -999;
     }
@@ -221,7 +223,10 @@ namespace ShowerRecoTools {
 
     for (auto const& hit : hits) {
 
-      double hitCharge = fApplyLifetimeCorrection ? hit->Integral() * fCalorimetryAlg.LifetimeCorrection(clockData, detProp, hit->PeakTime()) : hit->Integral();
+      double hitCharge = fApplyLifetimeCorrection ?
+                           hit->Integral() * fCalorimetryAlg.LifetimeCorrection(
+                                               clockData, detProp, hit->PeakTime()) :
+                           hit->Integral();
 
       hitCharge /= fRecombinationFactor;
 
