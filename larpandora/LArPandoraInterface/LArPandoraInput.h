@@ -191,6 +191,15 @@ namespace lar_pandora {
                                        const HitMap& hitMap,
                                        const HitsToTrackIDEs& hitToParticleMap);
 
+    /**
+     *  @brief  Create links between the optical hits and Pandora MC particles
+     *
+     *  @param  settings the settings
+     *  @param  idToOpHitMap mapping from Pandora optical hit IDs to the ART OpHits
+     */
+    static void CreatePandoraMCLinksOp(const Settings &settings,
+                                       const IdToOpHitMap &idToOpHitMap);
+
   private:
     typedef std::map<std::string, lar_content::MCProcess> MCProcessMap;
 

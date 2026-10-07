@@ -15,6 +15,8 @@
 
 #include "lardataobj/RecoBase/Hit.h"
 #include "lardataobj/RecoBase/OpHit.h"
+#include "lardataobj/Simulation/OpDetBacktrackerRecord.h"
+#include "lardataobj/Simulation/sim.h"
 
 #include "lardataobj/Simulation/SimEnergyDeposit.h"
 #include "larevt/CalibrationDBI/Interface/ChannelStatusProvider.h"
@@ -23,6 +25,7 @@
 #include "nusimdata/SimulationBase/MCTruth.h"
 
 #include "larsim/MCCheater/ParticleInventoryService.h"
+#include "larsim/MCCheater/PhotonBackTrackerService.h"
 
 #include "lardata/DetectorInfoServices/DetectorClocksService.h"
 #include "lardata/DetectorInfoServices/DetectorPropertiesService.h"
@@ -204,36 +207,34 @@ namespace lar_pandora {
         << "CreatePandoraOpHits - primary Pandora instance does not exist";
 
     const pandora::Pandora* pPandora(settings.m_pPrimaryPandora);
-    art::ServiceHandle<geo::Geometry const> theGeometry;
-
     lar_content::LArHitFactory hitFactory;
     int hitCounter(hitCounterOffset);
 
+    auto const& wireReadout(art::ServiceHandle<geo::WireReadout const>()->Get());
     for (auto const& opHit : opHitVector) {
       const unsigned int channel(static_cast<unsigned int>(opHit->OpChannel()));
-      const geo::OpDetGeo& opDet(theGeometry->OpDetGeoFromOpDet(channel));
+      const geo::OpDetGeo& opDet(wireReadout.OpDetGeoFromOpChannel(channel));
       const geo::Point_t center(opDet.GetCenter());
+      const geo::Vector_t normal(opDet.toWorldCoords(geo::OpDetGeo::LocalVector_t{0., 0., 1.}));
       const pandora::HitType hitType(LArPandoraInput::GetOpHitType(opDet));
 
       lar_content::LArHitParameters hitParameters;
 
       try {
         hitParameters.m_positionVector = pandora::CartesianVector(center.X(), center.Y(), center.Z());
-        hitParameters.m_expectedDirection = pandora::CartesianVector(0.f, 0.f, 1.f);
-        hitParameters.m_cellNormalVector  = pandora::CartesianVector(0.f, 0.f, 1.f);
-
-        // ATTN: Currently just defaulting to nominal values - this should be reviewed.
-        hitParameters.m_cellSize0 = settings.m_dx_cm;
-        hitParameters.m_cellSize1 = settings.m_dx_cm;
-        hitParameters.m_cellThickness = settings.m_dx_cm;
+        hitParameters.m_cellNormalVector  = pandora::CartesianVector(normal.X(), normal.Y(), normal.Z());
+        hitParameters.m_expectedDirection = hitParameters.m_cellNormalVector;
+        hitParameters.m_cellSize0 = opDet.Height();
+        hitParameters.m_cellSize1 = opDet.Width();
+        hitParameters.m_cellThickness = opDet.Length();
         hitParameters.m_cellGeometry = pandora::RECTANGULAR;
-        hitParameters.m_nCellRadiationLengths = settings.m_dx_cm / settings.m_rad_cm;
-        hitParameters.m_nCellInteractionLengths = settings.m_dx_cm / settings.m_int_cm;
+        hitParameters.m_nCellRadiationLengths = 0;
+        hitParameters.m_nCellInteractionLengths = 0;
 
         // ATTN: confirm the units
         hitParameters.m_time = static_cast<float>(opHit->PeakTime());
 
-        hitParameters.m_isDigital = true;
+        hitParameters.m_isDigital = false;
         hitParameters.m_hitType = hitType;
         hitParameters.m_hitRegion = pandora::SINGLE_REGION;
         hitParameters.m_layer = 0;
@@ -900,7 +901,6 @@ namespace lar_pandora {
          ++iterI) {
       const int hitID(iterI->first);
       const art::Ptr<recob::Hit> hit(iterI->second);
-      //  const geo::WireID hit_WireID(hit->WireID());
 
       // Get list of associated MC particles
       HitsToTrackIDEs::const_iterator iterJ = hitToParticleMap.find(hit);
@@ -931,6 +931,66 @@ namespace lar_pandora {
                                           "mc particle relationship, invalid information supplied "
                                        << std::endl;
           continue;
+        }
+      }
+    }
+  }
+
+  //------------------------------------------------------------------------------------------------------------------------------------------
+
+  void LArPandoraInput::CreatePandoraMCLinksOp(const Settings &settings,
+                                               const IdToOpHitMap &idToOpHitMap)
+  {
+    mf::LogDebug("LArPandora") << " *** LArPandoraInput::CreatePandoraMCLinksOp(...) *** " << std::endl;
+
+    if (!settings.m_pPrimaryPandora)
+      throw cet::exception("LArPandora")
+        << "CreatePandoraMCLinksOp - primary Pandora instance does not exist";
+
+    const pandora::Pandora *const pPandora(settings.m_pPrimaryPandora);
+
+    art::ServiceHandle<cheat::PhotonBackTrackerService> photonBackTracker;
+
+    for (const auto &[hitID, opHit] : idToOpHitMap)
+    {
+      const std::vector<const sim::SDP *> sdps = photonBackTracker->OpHitToSimSDPs_Ps(opHit);
+      std::map<int, double> trackIdToPhotons;
+      double totalPhotons = 0.;
+
+      for (const sim::SDP *const pSdp : sdps)
+      {
+        if (!pSdp)
+          continue;
+
+        const double nPhotons = std::max(0.f, pSdp->numPhotons);
+        totalPhotons += nPhotons;
+
+        if (pSdp->trackID == sim::NoParticleId)
+          continue;
+
+        const int trackID = std::abs(pSdp->trackID);
+        trackIdToPhotons[trackID] += nPhotons;
+      }
+
+      if (totalPhotons <= std::numeric_limits<double>::epsilon())
+        continue;
+
+      for (const auto &[trackID, nPhotons] : trackIdToPhotons)
+      {
+        const float photonFraction = static_cast<float>(nPhotons / totalPhotons);
+
+        if (photonFraction <= 0.f)
+          continue;
+
+        try
+        {
+          PANDORA_THROW_RESULT_IF(pandora::STATUS_CODE_SUCCESS, !=, PandoraApi::SetCaloHitToMCParticleRelationship(
+            *pPandora, (void *)((intptr_t)hitID), (void *)((intptr_t)trackID), photonFraction));
+        }
+        catch (const pandora::StatusCodeException &)
+        {
+          mf::LogWarning("LArPandora") << "CreatePandoraMCLinksOp - unable to create optical hit " << "to MC particle relationship for hit "
+            << hitID << " and track " << trackID << std::endl;
         }
       }
     }

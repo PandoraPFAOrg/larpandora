@@ -256,12 +256,12 @@ namespace lar_pandora {
     const int opHitCounterOffset = LArPandoraInput::CreatePandoraHits2D(
       evt, m_inputSettings, m_driftVolumeMap, artHits, hitToScores, hitToScoreLabels, idToHitMap);
 
+    IdToOpHitMap idToOpHitMap;
     if (m_enableOpHits) {
       OpHitVector artOpHits;
       auto const opHitHandle = evt.getValidHandle<std::vector<recob::OpHit>>(m_opHitFinderModuleLabel);
       art::fill_ptr_vector(artOpHits, opHitHandle);
 
-      IdToOpHitMap idToOpHitMap;
       LArPandoraInput::CreatePandoraOpHits(m_inputSettings, artOpHits, opHitCounterOffset, idToOpHitMap);
     }
 
@@ -272,6 +272,8 @@ namespace lar_pandora {
                                                 generatorArtMCParticleVector,
                                                 artTrackIDToEDepSims);
       LArPandoraInput::CreatePandoraMCLinks2D(m_inputSettings, idToHitMap, artHitsToTrackIDEs);
+      if (m_enableOpHits)
+        LArPandoraInput::CreatePandoraMCLinksOp(m_inputSettings, idToOpHitMap);
     }
   }
 
