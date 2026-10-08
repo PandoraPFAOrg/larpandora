@@ -1100,22 +1100,20 @@ namespace lar_pandora {
 
   pandora::HitType LArPandoraInput::GetOpHitType(const geo::OpDetGeo& opDet)
   {
-    // ATTN: Right now I'm essentially guessing the types, need to check these - though I suspect it doesn't really matter?
+    // ATTN: All shapes return the same underlying hit type
 	// Flat geometry -> e.g. x-arapuca
     if (opDet.isBar())
-      return pandora::OPTICAL_TRAP;
+      return pandora::OPTICAL;
 
     // Cylindrical or spherical geometry -> e.g. PMT
     if (opDet.isTube() || opDet.isSphere())
-      return pandora::OPTICAL_TPC;
+      return pandora::OPTICAL;
 
     // Unknown shape -> default to SIPM
     mf::LogWarning("LArPandora")
-      << "GetOpHitType - unrecognised optical detector shape '"
-      << opDet.Shape()->IsA()->GetName()
-      << "', defaulting to OPTICAL_SIPM";
+      << "GetOpHitType - unrecognised optical detector shape '" << opDet.Shape()->IsA()->GetName() << "'";
 
-    return pandora::OPTICAL_SIPM;
+    return pandora::OPTICAL;
   }
 
   //------------------------------------------------------------------------------------------------------------------------------------------
