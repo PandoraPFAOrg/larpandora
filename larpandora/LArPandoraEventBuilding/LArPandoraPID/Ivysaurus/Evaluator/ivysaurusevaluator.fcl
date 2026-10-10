@@ -1,0 +1,23 @@
+#include "gridmanager.fcl"
+#include "pfpvarmanager.fcl"
+#include "trackvarmanager.fcl"
+#include "showervarmanager.fcl"
+
+BEGIN_PROLOG
+
+ivysaurus_evaluator:
+{
+  GridManager:            @local::grid_manager
+  PFPVarManager:          @local::pfpvar_manager
+  TrackVarManager:        @local::trackvar_manager
+  ShowerVarManager:       @local::showervar_manager
+  NetName:                "PandoraNet_IvyEvaluator_All_DUNEFD_HD_v1_0_0.pt"
+  NTrackVars:              22
+  NShowerVars:             10
+  RecoModuleLabel:        "pandora"
+  TrackModuleLabel:       "pandoraTrack"
+  ShowerModuleLabel:      "pandoraShower"
+}
+
+END_PROLOG
+
