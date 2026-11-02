@@ -259,10 +259,12 @@ namespace lar_pandora {
     IdToOpHitMap idToOpHitMap;
     if (m_enableOpHits) {
       OpHitVector artOpHits;
-      auto const opHitHandle = evt.getValidHandle<std::vector<recob::OpHit>>(m_opHitFinderModuleLabel);
+      auto const opHitHandle =
+        evt.getValidHandle<std::vector<recob::OpHit>>(m_opHitFinderModuleLabel);
       art::fill_ptr_vector(artOpHits, opHitHandle);
 
-      LArPandoraInput::CreatePandoraOpHits(m_inputSettings, artOpHits, opHitCounterOffset, idToOpHitMap);
+      LArPandoraInput::CreatePandoraOpHits(
+        m_inputSettings, artOpHits, opHitCounterOffset, idToOpHitMap);
     }
 
     if (m_enableMCParticles && (m_disableRealDataCheck || !evt.isRealData())) {
@@ -272,8 +274,7 @@ namespace lar_pandora {
                                                 generatorArtMCParticleVector,
                                                 artTrackIDToEDepSims);
       LArPandoraInput::CreatePandoraMCLinks2D(m_inputSettings, idToHitMap, artHitsToTrackIDEs);
-      if (m_enableOpHits)
-        LArPandoraInput::CreatePandoraMCLinksOp(m_inputSettings, idToOpHitMap);
+      if (m_enableOpHits) LArPandoraInput::CreatePandoraMCLinksOp(m_inputSettings, idToOpHitMap);
     }
   }
 

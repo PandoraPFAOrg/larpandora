@@ -94,12 +94,12 @@ namespace lar_pandora {
      *  @return The number of hits created.
      */
     static int CreatePandoraHits2D(const art::Event& evt,
-                                    const Settings& settings,
-                                    const LArDriftVolumeMap& driftVolumeMap,
-                                    const HitVector& hitVector,
-                                    const HitToScores& hitToScores,
-                                    const HitToScoreLabels& hitToScoreLabels,
-                                    IdToHitMap& idToHitMap);
+                                   const Settings& settings,
+                                   const LArDriftVolumeMap& driftVolumeMap,
+                                   const HitVector& hitVector,
+                                   const HitToScores& hitToScores,
+                                   const HitToScoreLabels& hitToScoreLabels,
+                                   IdToHitMap& idToHitMap);
 
     /**
      *  @brief  Create Pandora optical hits from ART OpHits. Optical hits are assigned HitType OPTICAL_SIPM, OPTICAL_TRAP, or OPTICAL_TPC
@@ -197,8 +197,7 @@ namespace lar_pandora {
      *  @param  settings the settings
      *  @param  idToOpHitMap mapping from Pandora optical hit IDs to the ART OpHits
      */
-    static void CreatePandoraMCLinksOp(const Settings &settings,
-                                       const IdToOpHitMap &idToOpHitMap);
+    static void CreatePandoraMCLinksOp(const Settings& settings, const IdToOpHitMap& idToOpHitMap);
 
   private:
     typedef std::map<std::string, lar_content::MCProcess> MCProcessMap;
