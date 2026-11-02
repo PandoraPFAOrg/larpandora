@@ -177,10 +177,9 @@ namespace lar_pandora {
 
       // Create the Pandora hit
       try {
-        PANDORA_THROW_RESULT_IF(
-          pandora::STATUS_CODE_SUCCESS,
-          !=,
-          PandoraApi::CaloHit::Create(*pPandora, hitParameters, hitFactory));
+        PANDORA_THROW_RESULT_IF(pandora::STATUS_CODE_SUCCESS,
+                                !=,
+                                PandoraApi::CaloHit::Create(*pPandora, hitParameters, hitFactory));
       }
       catch (const pandora::StatusCodeException&) {
         mf::LogWarning("LArPandora") << "CreatePandoraHits2D - unable to create calo hit, "
@@ -221,8 +220,10 @@ namespace lar_pandora {
       lar_content::LArHitParameters hitParameters;
 
       try {
-        hitParameters.m_positionVector = pandora::CartesianVector(center.X(), center.Y(), center.Z());
-        hitParameters.m_cellNormalVector  = pandora::CartesianVector(normal.X(), normal.Y(), normal.Z());
+        hitParameters.m_positionVector =
+          pandora::CartesianVector(center.X(), center.Y(), center.Z());
+        hitParameters.m_cellNormalVector =
+          pandora::CartesianVector(normal.X(), normal.Y(), normal.Z());
         hitParameters.m_expectedDirection = hitParameters.m_cellNormalVector;
         hitParameters.m_cellSize0 = opDet.Height();
         hitParameters.m_cellSize1 = opDet.Width();
@@ -255,8 +256,7 @@ namespace lar_pandora {
       }
       catch (const pandora::StatusCodeException&) {
         mf::LogWarning("LArPandora")
-          << "CreatePandoraOpHits - invalid parameter provided, optical hit omitted"
-          << std::endl;
+          << "CreatePandoraOpHits - invalid parameter provided, optical hit omitted" << std::endl;
         continue;
       }
 
@@ -267,15 +267,14 @@ namespace lar_pandora {
       idToOpHitMap[hitCounter] = opHit;
 
       try {
-        PANDORA_THROW_RESULT_IF(
-          pandora::STATUS_CODE_SUCCESS, !=,
-          PandoraApi::CaloHit::Create(*pPandora, hitParameters, hitFactory));
+        PANDORA_THROW_RESULT_IF(pandora::STATUS_CODE_SUCCESS,
+                                !=,
+                                PandoraApi::CaloHit::Create(*pPandora, hitParameters, hitFactory));
       }
       catch (const pandora::StatusCodeException&) {
-        mf::LogWarning("LArPandora")
-          << "CreatePandoraOpHits - unable to create optical hit, "
-             "insufficient or invalid information supplied"
-          << std::endl;
+        mf::LogWarning("LArPandora") << "CreatePandoraOpHits - unable to create optical hit, "
+                                        "insufficient or invalid information supplied"
+                                     << std::endl;
         continue;
       }
     }
@@ -938,59 +937,55 @@ namespace lar_pandora {
 
   //------------------------------------------------------------------------------------------------------------------------------------------
 
-  void LArPandoraInput::CreatePandoraMCLinksOp(const Settings &settings,
-                                               const IdToOpHitMap &idToOpHitMap)
+  void LArPandoraInput::CreatePandoraMCLinksOp(const Settings& settings,
+                                               const IdToOpHitMap& idToOpHitMap)
   {
-    mf::LogDebug("LArPandora") << " *** LArPandoraInput::CreatePandoraMCLinksOp(...) *** " << std::endl;
+    mf::LogDebug("LArPandora") << " *** LArPandoraInput::CreatePandoraMCLinksOp(...) *** "
+                               << std::endl;
 
     if (!settings.m_pPrimaryPandora)
       throw cet::exception("LArPandora")
         << "CreatePandoraMCLinksOp - primary Pandora instance does not exist";
 
-    const pandora::Pandora *const pPandora(settings.m_pPrimaryPandora);
+    const pandora::Pandora* const pPandora(settings.m_pPrimaryPandora);
 
     art::ServiceHandle<cheat::PhotonBackTrackerService> photonBackTracker;
 
-    for (const auto &[hitID, opHit] : idToOpHitMap)
-    {
-      const std::vector<const sim::SDP *> sdps = photonBackTracker->OpHitToSimSDPs_Ps(opHit);
+    for (const auto& [hitID, opHit] : idToOpHitMap) {
+      const std::vector<const sim::SDP*> sdps = photonBackTracker->OpHitToSimSDPs_Ps(opHit);
       std::map<int, double> trackIdToPhotons;
       double totalPhotons = 0.;
 
-      for (const sim::SDP *const pSdp : sdps)
-      {
-        if (!pSdp)
-          continue;
+      for (const sim::SDP* const pSdp : sdps) {
+        if (!pSdp) continue;
 
         const double nPhotons = std::max(0.f, pSdp->numPhotons);
         totalPhotons += nPhotons;
 
-        if (pSdp->trackID == sim::NoParticleId)
-          continue;
+        if (pSdp->trackID == sim::NoParticleId) continue;
 
         const int trackID = std::abs(pSdp->trackID);
         trackIdToPhotons[trackID] += nPhotons;
       }
 
-      if (totalPhotons <= std::numeric_limits<double>::epsilon())
-        continue;
+      if (totalPhotons <= std::numeric_limits<double>::epsilon()) continue;
 
-      for (const auto &[trackID, nPhotons] : trackIdToPhotons)
-      {
+      for (const auto& [trackID, nPhotons] : trackIdToPhotons) {
         const float photonFraction = static_cast<float>(nPhotons / totalPhotons);
 
-        if (photonFraction <= 0.f)
-          continue;
+        if (photonFraction <= 0.f) continue;
 
-        try
-        {
-          PANDORA_THROW_RESULT_IF(pandora::STATUS_CODE_SUCCESS, !=, PandoraApi::SetCaloHitToMCParticleRelationship(
-            *pPandora, (void *)((intptr_t)hitID), (void *)((intptr_t)trackID), photonFraction));
+        try {
+          PANDORA_THROW_RESULT_IF(
+            pandora::STATUS_CODE_SUCCESS,
+            !=,
+            PandoraApi::SetCaloHitToMCParticleRelationship(
+              *pPandora, (void*)((intptr_t)hitID), (void*)((intptr_t)trackID), photonFraction));
         }
-        catch (const pandora::StatusCodeException &)
-        {
-          mf::LogWarning("LArPandora") << "CreatePandoraMCLinksOp - unable to create optical hit " << "to MC particle relationship for hit "
-            << hitID << " and track " << trackID << std::endl;
+        catch (const pandora::StatusCodeException&) {
+          mf::LogWarning("LArPandora") << "CreatePandoraMCLinksOp - unable to create optical hit "
+                                       << "to MC particle relationship for hit " << hitID
+                                       << " and track " << trackID << std::endl;
         }
       }
     }
@@ -1101,17 +1096,15 @@ namespace lar_pandora {
   pandora::HitType LArPandoraInput::GetOpHitType(const geo::OpDetGeo& opDet)
   {
     // ATTN: All shapes return the same underlying hit type
-	// Flat geometry -> e.g. x-arapuca
-    if (opDet.isBar())
-      return pandora::OPTICAL;
+    // Flat geometry -> e.g. x-arapuca
+    if (opDet.isBar()) return pandora::OPTICAL;
 
     // Cylindrical or spherical geometry -> e.g. PMT
-    if (opDet.isTube() || opDet.isSphere())
-      return pandora::OPTICAL;
+    if (opDet.isTube() || opDet.isSphere()) return pandora::OPTICAL;
 
     // Unknown shape -> default to SIPM
-    mf::LogWarning("LArPandora")
-      << "GetOpHitType - unrecognised optical detector shape '" << opDet.Shape()->IsA()->GetName() << "'";
+    mf::LogWarning("LArPandora") << "GetOpHitType - unrecognised optical detector shape '"
+                                 << opDet.Shape()->IsA()->GetName() << "'";
 
     return pandora::OPTICAL;
   }
