@@ -42,6 +42,7 @@ cet_make_library(LIBRARY_NAME_VAR lib_target
   larevt::ChannelStatusProvider
   larevt::ChannelStatusService
   larsim::MCCheater_ParticleInventoryService_service
+  larsim::MCCheater_PhotonBackTrackerService_service
   lardata::DetectorClocksService
   lardata::DetectorPropertiesService
   larcore::Geometry_Geometry_service

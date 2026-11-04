@@ -14,6 +14,9 @@
 #include "larcoreobj/SimpleTypesAndConstants/RawTypes.h"
 
 #include "lardataobj/RecoBase/Hit.h"
+#include "lardataobj/RecoBase/OpHit.h"
+#include "lardataobj/Simulation/OpDetBacktrackerRecord.h"
+#include "lardataobj/Simulation/sim.h"
 
 #include "lardataobj/Simulation/SimEnergyDeposit.h"
 #include "larevt/CalibrationDBI/Interface/ChannelStatusProvider.h"
@@ -22,6 +25,7 @@
 #include "nusimdata/SimulationBase/MCTruth.h"
 
 #include "larsim/MCCheater/ParticleInventoryService.h"
+#include "larsim/MCCheater/PhotonBackTrackerService.h"
 
 #include "lardata/DetectorInfoServices/DetectorClocksService.h"
 #include "lardata/DetectorInfoServices/DetectorPropertiesService.h"
@@ -44,13 +48,13 @@
 
 namespace lar_pandora {
 
-  void LArPandoraInput::CreatePandoraHits2D(const art::Event& e,
-                                            const Settings& settings,
-                                            const LArDriftVolumeMap& driftVolumeMap,
-                                            const HitVector& hitVector,
-                                            const HitToScores& hitToScores,
-                                            const HitToScoreLabels& hitToScoreLabels,
-                                            IdToHitMap& idToHitMap)
+  int LArPandoraInput::CreatePandoraHits2D(const art::Event& e,
+                                           const Settings& settings,
+                                           const LArDriftVolumeMap& driftVolumeMap,
+                                           const HitVector& hitVector,
+                                           const HitToScores& hitToScores,
+                                           const HitToScoreLabels& hitToScoreLabels,
+                                           IdToHitMap& idToHitMap)
   {
     mf::LogDebug("LArPandora") << " *** LArPandoraInput::CreatePandoraHits2D(...) *** "
                                << std::endl;
@@ -68,7 +72,7 @@ namespace lar_pandora {
     // Loop over ART hits
     int hitCounter(settings.m_hitCounterOffset);
 
-    lar_content::LArCaloHitFactory caloHitFactory;
+    lar_content::LArHitFactory hitFactory;
 
     for (auto const& hit : hitVector) {
       const geo::WireID hit_WireID(hit->WireID());
@@ -96,50 +100,50 @@ namespace lar_pandora {
       const double mips(LArPandoraInput::GetMips(detProp, settings, hit_Charge, hit_View));
 
       // Create Pandora CaloHit
-      lar_content::LArCaloHitParameters caloHitParameters;
+      lar_content::LArHitParameters hitParameters;
 
       try {
-        caloHitParameters.m_expectedDirection = pandora::CartesianVector(0., 0., 1.);
-        caloHitParameters.m_cellNormalVector = pandora::CartesianVector(0., 0., 1.);
-        caloHitParameters.m_cellSize0 = settings.m_dx_cm;
-        caloHitParameters.m_cellSize1 = (settings.m_useHitWidths ? dxpos_cm : settings.m_dx_cm);
-        caloHitParameters.m_cellThickness = wire_pitch_cm;
-        caloHitParameters.m_cellGeometry = pandora::RECTANGULAR;
-        caloHitParameters.m_time = 0.;
-        caloHitParameters.m_nCellRadiationLengths = settings.m_dx_cm / settings.m_rad_cm;
-        caloHitParameters.m_nCellInteractionLengths = settings.m_dx_cm / settings.m_int_cm;
-        caloHitParameters.m_isDigital = false;
-        caloHitParameters.m_hitRegion = pandora::SINGLE_REGION;
-        caloHitParameters.m_layer = 0;
-        caloHitParameters.m_isInOuterSamplingLayer = false;
-        caloHitParameters.m_inputEnergy = hit_Charge;
-        caloHitParameters.m_mipEquivalentEnergy = mips;
-        caloHitParameters.m_electromagneticEnergy = mips * settings.m_mips_to_gev;
-        caloHitParameters.m_hadronicEnergy = mips * settings.m_mips_to_gev;
-        caloHitParameters.m_pParentAddress = (void*)((intptr_t)(++hitCounter));
-        caloHitParameters.m_larTPCVolumeId =
+        hitParameters.m_expectedDirection = pandora::CartesianVector(0., 0., 1.);
+        hitParameters.m_cellNormalVector = pandora::CartesianVector(0., 0., 1.);
+        hitParameters.m_cellSize0 = settings.m_dx_cm;
+        hitParameters.m_cellSize1 = (settings.m_useHitWidths ? dxpos_cm : settings.m_dx_cm);
+        hitParameters.m_cellThickness = wire_pitch_cm;
+        hitParameters.m_cellGeometry = pandora::RECTANGULAR;
+        hitParameters.m_time = 0.;
+        hitParameters.m_nCellRadiationLengths = settings.m_dx_cm / settings.m_rad_cm;
+        hitParameters.m_nCellInteractionLengths = settings.m_dx_cm / settings.m_int_cm;
+        hitParameters.m_isDigital = false;
+        hitParameters.m_hitRegion = pandora::SINGLE_REGION;
+        hitParameters.m_layer = 0;
+        hitParameters.m_isInOuterSamplingLayer = false;
+        hitParameters.m_inputEnergy = hit_Charge;
+        hitParameters.m_mipEquivalentEnergy = mips;
+        hitParameters.m_electromagneticEnergy = mips * settings.m_mips_to_gev;
+        hitParameters.m_hadronicEnergy = mips * settings.m_mips_to_gev;
+        hitParameters.m_pParentAddress = (void*)((intptr_t)(++hitCounter));
+        hitParameters.m_larTPCVolumeId =
           LArPandoraGeometry::GetVolumeID(driftVolumeMap, hit_WireID.Cryostat, hit_WireID.TPC);
-        caloHitParameters.m_daughterVolumeId = LArPandoraGeometry::GetDaughterVolumeID(
+        hitParameters.m_daughterVolumeId = LArPandoraGeometry::GetDaughterVolumeID(
           driftVolumeMap, hit_WireID.Cryostat, hit_WireID.TPC);
-        caloHitParameters.m_channelId = hit_WireID.Wire;
+        hitParameters.m_channelId = hit_WireID.Wire;
 
         if (hit_View == detType->TargetViewW(hit_WireID.TPC, hit_WireID.Cryostat)) {
-          caloHitParameters.m_hitType = pandora::TPC_VIEW_W;
+          hitParameters.m_hitType = pandora::TPC_VIEW_W;
           const double wpos_cm(
             pPandora->GetPlugins()->GetLArTransformationPlugin()->YZtoW(y0_cm, z0_cm));
-          caloHitParameters.m_positionVector = pandora::CartesianVector(xpos_cm, 0., wpos_cm);
+          hitParameters.m_positionVector = pandora::CartesianVector(xpos_cm, 0., wpos_cm);
         }
         else if (hit_View == detType->TargetViewU(hit_WireID.TPC, hit_WireID.Cryostat)) {
-          caloHitParameters.m_hitType = pandora::TPC_VIEW_U;
+          hitParameters.m_hitType = pandora::TPC_VIEW_U;
           const double upos_cm(
             pPandora->GetPlugins()->GetLArTransformationPlugin()->YZtoU(y0_cm, z0_cm));
-          caloHitParameters.m_positionVector = pandora::CartesianVector(xpos_cm, 0., upos_cm);
+          hitParameters.m_positionVector = pandora::CartesianVector(xpos_cm, 0., upos_cm);
         }
         else if (hit_View == detType->TargetViewV(hit_WireID.TPC, hit_WireID.Cryostat)) {
-          caloHitParameters.m_hitType = pandora::TPC_VIEW_V;
+          hitParameters.m_hitType = pandora::TPC_VIEW_V;
           const double vpos_cm(
             pPandora->GetPlugins()->GetLArTransformationPlugin()->YZtoV(y0_cm, z0_cm));
-          caloHitParameters.m_positionVector = pandora::CartesianVector(xpos_cm, 0., vpos_cm);
+          hitParameters.m_positionVector = pandora::CartesianVector(xpos_cm, 0., vpos_cm);
         }
         else {
           throw cet::exception("LArPandora")
@@ -159,8 +163,8 @@ namespace lar_pandora {
         auto itScorePred = hitToScores.find(hit);
         auto itLabelPred = hitToScoreLabels.find(hit);
         if ((itScorePred != hitToScores.end()) && (itLabelPred != hitToScoreLabels.end())) {
-          caloHitParameters.m_hitScores = itScorePred->second;
-          caloHitParameters.m_hitScoreLabels = itLabelPred->second;
+          hitParameters.m_hitScores = itScorePred->second;
+          hitParameters.m_hitScoreLabels = itLabelPred->second;
         }
       }
 
@@ -173,14 +177,103 @@ namespace lar_pandora {
 
       // Create the Pandora hit
       try {
-        PANDORA_THROW_RESULT_IF(
-          pandora::STATUS_CODE_SUCCESS,
-          !=,
-          PandoraApi::CaloHit::Create(*pPandora, caloHitParameters, caloHitFactory));
+        PANDORA_THROW_RESULT_IF(pandora::STATUS_CODE_SUCCESS,
+                                !=,
+                                PandoraApi::CaloHit::Create(*pPandora, hitParameters, hitFactory));
       }
       catch (const pandora::StatusCodeException&) {
         mf::LogWarning("LArPandora") << "CreatePandoraHits2D - unable to create calo hit, "
                                         "insufficient or invalid information supplied "
+                                     << std::endl;
+        continue;
+      }
+    }
+
+    return hitCounter;
+  }
+
+  //
+  void LArPandoraInput::CreatePandoraOpHits(const Settings& settings,
+                                            const OpHitVector& opHitVector,
+                                            int hitCounterOffset,
+                                            IdToOpHitMap& idToOpHitMap)
+  {
+    mf::LogDebug("LArPandora") << " *** LArPandoraInput::CreatePandoraOpHits(...) *** "
+                               << std::endl;
+
+    if (!settings.m_pPrimaryPandora)
+      throw cet::exception("LArPandora")
+        << "CreatePandoraOpHits - primary Pandora instance does not exist";
+
+    const pandora::Pandora* pPandora(settings.m_pPrimaryPandora);
+    lar_content::LArHitFactory hitFactory;
+    int hitCounter(hitCounterOffset);
+
+    auto const& wireReadout(art::ServiceHandle<geo::WireReadout const>()->Get());
+    for (auto const& opHit : opHitVector) {
+      const unsigned int channel(static_cast<unsigned int>(opHit->OpChannel()));
+      const geo::OpDetGeo& opDet(wireReadout.OpDetGeoFromOpChannel(channel));
+      const geo::Point_t center(opDet.GetCenter());
+      const geo::Vector_t normal(opDet.toWorldCoords(geo::OpDetGeo::LocalVector_t{0., 0., 1.}));
+      const pandora::HitType hitType(LArPandoraInput::GetOpHitType(opDet));
+
+      lar_content::LArHitParameters hitParameters;
+
+      try {
+        hitParameters.m_positionVector =
+          pandora::CartesianVector(center.X(), center.Y(), center.Z());
+        hitParameters.m_cellNormalVector =
+          pandora::CartesianVector(normal.X(), normal.Y(), normal.Z());
+        hitParameters.m_expectedDirection = hitParameters.m_cellNormalVector;
+        hitParameters.m_cellSize0 = opDet.Height();
+        hitParameters.m_cellSize1 = opDet.Width();
+        hitParameters.m_cellThickness = opDet.Length();
+        hitParameters.m_cellGeometry = pandora::RECTANGULAR;
+        hitParameters.m_nCellRadiationLengths = 0;
+        hitParameters.m_nCellInteractionLengths = 0;
+
+        // ATTN: confirm the units
+        hitParameters.m_time = static_cast<float>(opHit->PeakTime());
+
+        hitParameters.m_isDigital = false;
+        hitParameters.m_hitType = hitType;
+        hitParameters.m_hitRegion = pandora::SINGLE_REGION;
+        hitParameters.m_layer = 0;
+        hitParameters.m_isInOuterSamplingLayer = false;
+
+        // ATTN: photo electron count is set as input energy, all other energies currently set to zero
+        hitParameters.m_inputEnergy = opHit->PE();
+        hitParameters.m_mipEquivalentEnergy = 0.f;
+        hitParameters.m_electromagneticEnergy = 0.f;
+        hitParameters.m_hadronicEnergy = 0.f;
+
+        hitParameters.m_pParentAddress = (void*)((intptr_t)(++hitCounter));
+
+        // ATTN: confirm the units
+        hitParameters.m_startTime = static_cast<float>(opHit->StartTime());
+        hitParameters.m_width = static_cast<float>(opHit->Width());
+        hitParameters.m_channelId = channel;
+      }
+      catch (const pandora::StatusCodeException&) {
+        mf::LogWarning("LArPandora")
+          << "CreatePandoraOpHits - invalid parameter provided, optical hit omitted" << std::endl;
+        continue;
+      }
+
+      if (hitCounter >= settings.m_uidOffset)
+        throw cet::exception("LArPandora")
+          << "CreatePandoraOpHits - optical hit counter overflow (" << hitCounter << ")";
+
+      idToOpHitMap[hitCounter] = opHit;
+
+      try {
+        PANDORA_THROW_RESULT_IF(pandora::STATUS_CODE_SUCCESS,
+                                !=,
+                                PandoraApi::CaloHit::Create(*pPandora, hitParameters, hitFactory));
+      }
+      catch (const pandora::StatusCodeException&) {
+        mf::LogWarning("LArPandora") << "CreatePandoraOpHits - unable to create optical hit, "
+                                        "insufficient or invalid information supplied"
                                      << std::endl;
         continue;
       }
@@ -807,7 +900,6 @@ namespace lar_pandora {
          ++iterI) {
       const int hitID(iterI->first);
       const art::Ptr<recob::Hit> hit(iterI->second);
-      //  const geo::WireID hit_WireID(hit->WireID());
 
       // Get list of associated MC particles
       HitsToTrackIDEs::const_iterator iterJ = hitToParticleMap.find(hit);
@@ -838,6 +930,62 @@ namespace lar_pandora {
                                           "mc particle relationship, invalid information supplied "
                                        << std::endl;
           continue;
+        }
+      }
+    }
+  }
+
+  //------------------------------------------------------------------------------------------------------------------------------------------
+
+  void LArPandoraInput::CreatePandoraMCLinksOp(const Settings& settings,
+                                               const IdToOpHitMap& idToOpHitMap)
+  {
+    mf::LogDebug("LArPandora") << " *** LArPandoraInput::CreatePandoraMCLinksOp(...) *** "
+                               << std::endl;
+
+    if (!settings.m_pPrimaryPandora)
+      throw cet::exception("LArPandora")
+        << "CreatePandoraMCLinksOp - primary Pandora instance does not exist";
+
+    const pandora::Pandora* const pPandora(settings.m_pPrimaryPandora);
+
+    art::ServiceHandle<cheat::PhotonBackTrackerService> photonBackTracker;
+
+    for (const auto& [hitID, opHit] : idToOpHitMap) {
+      const std::vector<const sim::SDP*> sdps = photonBackTracker->OpHitToSimSDPs_Ps(opHit);
+      std::map<int, double> trackIdToPhotons;
+      double totalPhotons = 0.;
+
+      for (const sim::SDP* const pSdp : sdps) {
+        if (!pSdp) continue;
+
+        const double nPhotons = std::max(0.f, pSdp->numPhotons);
+        totalPhotons += nPhotons;
+
+        if (pSdp->trackID == sim::NoParticleId) continue;
+
+        const int trackID = std::abs(pSdp->trackID);
+        trackIdToPhotons[trackID] += nPhotons;
+      }
+
+      if (totalPhotons <= std::numeric_limits<double>::epsilon()) continue;
+
+      for (const auto& [trackID, nPhotons] : trackIdToPhotons) {
+        const float photonFraction = static_cast<float>(nPhotons / totalPhotons);
+
+        if (photonFraction <= 0.f) continue;
+
+        try {
+          PANDORA_THROW_RESULT_IF(
+            pandora::STATUS_CODE_SUCCESS,
+            !=,
+            PandoraApi::SetCaloHitToMCParticleRelationship(
+              *pPandora, (void*)((intptr_t)hitID), (void*)((intptr_t)trackID), photonFraction));
+        }
+        catch (const pandora::StatusCodeException&) {
+          mf::LogWarning("LArPandora") << "CreatePandoraMCLinksOp - unable to create optical hit "
+                                       << "to MC particle relationship for hit " << hitID
+                                       << " and track " << trackID << std::endl;
         }
       }
     }
@@ -941,6 +1089,24 @@ namespace lar_pandora {
     if (mips > settings.m_mips_max) mips = settings.m_mips_max;
 
     return mips;
+  }
+
+  //------------------------------------------------------------------------------------------------------------------------------------------
+
+  pandora::HitType LArPandoraInput::GetOpHitType(const geo::OpDetGeo& opDet)
+  {
+    // ATTN: All shapes return the same underlying hit type
+    // Flat geometry -> e.g. x-arapuca
+    if (opDet.isBar()) return pandora::OPTICAL;
+
+    // Cylindrical or spherical geometry -> e.g. PMT
+    if (opDet.isTube() || opDet.isSphere()) return pandora::OPTICAL;
+
+    // Unknown shape -> default to SIPM
+    mf::LogWarning("LArPandora") << "GetOpHitType - unrecognised optical detector shape '"
+                                 << opDet.Shape()->IsA()->GetName() << "'";
+
+    return pandora::OPTICAL;
   }
 
   //------------------------------------------------------------------------------------------------------------------------------------------

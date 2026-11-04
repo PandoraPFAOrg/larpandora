@@ -1,8 +1,6 @@
 add_subdirectory(LArPandoraPIDData)
 add_subdirectory(Ivysaurus)
 
-find_package(Protobuf REQUIRED EXPORT)
-
 cet_add_compiler_flags(CXX -Wno-pedantic)
 
 cet_build_plugin(PandoraPID art::EDProducer
@@ -20,7 +18,6 @@ cet_build_plugin(PandoraPID art::EDProducer
       torch
       torch_cpu   
 )
-
 
 install_fhicl()
 install_source()
