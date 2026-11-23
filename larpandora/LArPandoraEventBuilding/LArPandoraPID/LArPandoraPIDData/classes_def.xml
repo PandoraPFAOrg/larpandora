@@ -1,8 +1,14 @@
 <lcgdict>
-  <class name="pandorapid::PandoraPIDResult" ClassVersion="11" >
+  <class name="pandorapid::PandoraPIDResult" ClassVersion="13" >
+   <version ClassVersion="13" checksum="3710737661"/>
+   <version ClassVersion="12" checksum="2521117393"/>
    <version ClassVersion="11" checksum="2675304912"/>
    <version ClassVersion="10" checksum="4008748239"/>
   </class>
+
+  <enum name="pandorapid::ParticleType"/>
+  <class name="std::map<pandorapid::ParticleType, float>"/>
+  <class name="std::pair<pandorapid::ParticleType, float>"/>
 
   <class name="art::Ptr<pandorapid::PandoraPIDResult>" />
   <class name="std::vector<pandorapid::PandoraPIDResult>"/>
